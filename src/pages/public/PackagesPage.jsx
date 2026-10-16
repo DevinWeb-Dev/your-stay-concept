@@ -1,525 +1,652 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+
 import {
+  ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
   CalendarDays,
   Check,
-  ChevronRight,
-  Clock3,
-  Heart,
+  Compass,
+  MapPin,
   ShieldCheck,
-  Sparkles,
   Users,
 } from "lucide-react";
 
 import {
   ADD_ONS,
+  DEMO_NOTICES,
   PHOTOS,
   formatPeso,
+  getZone,
 } from "../../data/config.js";
 
-import { localDateKey } from "../../engine/resortEngine.js";
 import { useResort } from "../../context/ResortContext.jsx";
 
-const PACKAGES = [
+import {
+  JOURNEY_PACKAGES,
+  dateAfter,
+  addDays,
+  bookingHref,
+} from "../../data/stayJourneys.js";
+
+import {
+  CoastalContours,
+  Reveal,
+  TideCompass,
+} from "../../components/StayMotion.jsx";
+
+import "../../styles/stay-booking-architectural.css";
+
+const TABS = [
   {
-    id: "lagoon-escape",
-    number: "01",
-    category: "couples",
-    label: "THE SIGNATURE ESCAPE",
-    name: "The Lagoon Escape",
-    subtitle: "Private waters. Unhurried moments.",
-    description:
-      "A carefully imagined retreat with peaceful mornings, a private-pool setting and time to reconnect.",
-    stayId: "lagoon-villa",
-    nights: 2,
-    guests: 2,
-    addons: ["floating-breakfast"],
-    image: PHOTOS.pool,
-    inclusions: [
-      "Two-night villa stay",
-      "Private-pool accommodation",
-      "Floating breakfast add-on",
-      "Access to listed villa amenities",
-    ],
+    id: "all",
+    label: "THE ENTIRE EDITION",
   },
   {
-    id: "family",
-    number: "02",
-    category: "family",
-    label: "TOGETHER IS A DESTINATION",
-    name: "The Family Gathering",
-    subtitle: "More time with your favorite people.",
-    description:
-      "An intimate tropical setting designed for family conversations, poolside afternoons and celebrations.",
-    stayId: "palm-garden-villa",
-    nights: 2,
-    guests: 4,
-    addons: ["celebration"],
-    image: PHOTOS.villas,
-    inclusions: [
-      "Two-night villa stay",
-      "Accommodation for four guests",
-      "Celebration styling add-on",
-      "Private villa amenities",
-    ],
+    id: "romance",
+    label: "FOR TWO",
   },
   {
-    id: "coastal-reset",
-    number: "03",
-    category: "couples",
-    label: "JUST THE TWO OF YOU",
-    name: "The Coastal Reset",
-    subtitle: "A quieter kind of beautiful.",
-    description:
-      "An understated suite escape for slow mornings, coastal inspiration and effortless comfort.",
-    stayId: "sea-glass-suite",
-    nights: 2,
-    guests: 2,
-    addons: [],
-    image: PHOTOS.suite,
-    inclusions: [
-      "Two-night coastal suite stay",
-      "Accommodation for two guests",
-      "Access to listed suite amenities",
-      "Flexible demo date selection",
-    ],
+    id: "together",
+    label: "TOGETHER",
   },
   {
-    id: "nature-retreat",
-    number: "04",
-    category: "nature",
-    label: "FIND YOUR STILLNESS",
-    name: "The Nature Hideaway",
-    subtitle: "Step away from the everyday.",
-    description:
-      "A secluded escape inspired by greener landscapes, fresh air and a more intentional pace.",
-    stayId: "ridge-hideaway",
-    nights: 3,
-    guests: 2,
-    addons: [],
-    image: PHOTOS.terrace,
-    inclusions: [
-      "Three-night nature-inspired stay",
-      "Accommodation for two guests",
-      "Access to listed cabin amenities",
-      "A sample slow-living itinerary",
-    ],
+    id: "nature",
+    label: "THE QUIET SIDE",
   },
 ];
-
-const FILTERS = [
-  { id: "all", label: "All escapes" },
-  { id: "couples", label: "For two" },
-  { id: "family", label: "Family & friends" },
-  { id: "nature", label: "Nature retreats" },
-];
-
-function dateAfter(days) {
-  const date = new Date();
-  date.setHours(12, 0, 0, 0);
-  date.setDate(date.getDate() + days);
-  return localDateKey(date);
-}
-
-function addDays(value, count) {
-  const [year, month, day] = value.split("-").map(Number);
-  const date = new Date(year, month - 1, day, 12);
-  date.setDate(date.getDate() + count);
-  return localDateKey(date);
-}
 
 export default function PackagesPage() {
   const navigate = useNavigate();
 
-  const {
-    accommodations,
-    getQuote,
-  } = useResort();
+  const { accommodations, getQuote } = useResort();
 
   const [filter, setFilter] = useState("all");
-  const [selectedId, setSelectedId] = useState(PACKAGES[0].id);
-  const [checkIn, setCheckIn] = useState(dateAfter(3));
-  const [guests, setGuests] = useState(PACKAGES[0].guests);
 
-  const selected =
-    PACKAGES.find((item) => item.id === selectedId) ||
-    PACKAGES[0];
+  const [activeId, setActiveId] = useState(
+    JOURNEY_PACKAGES[0].id
+  );
+
+  const [arrival, setArrival] = useState(
+    () => dateAfter(3)
+  );
+
+  const [people, setPeople] = useState(
+    JOURNEY_PACKAGES[0].guests
+  );
+
+  const [extraIds, setExtraIds] = useState([]);
+
+  const active =
+    JOURNEY_PACKAGES.find(
+      (item) => item.id === activeId
+    ) || JOURNEY_PACKAGES[0];
 
   const stay = accommodations.find(
-    (item) => item.id === selected.stayId
+    (s) => s.id === active.stayId
   );
 
-  const checkOut = useMemo(
-    () => checkIn ? addDays(checkIn, selected.nights) : "",
-    [checkIn, selected.nights]
-  );
-
-  const validGuests = Math.min(
-    Math.max(1, guests),
+  const guests = Math.min(
+    Math.max(people, 1),
     stay?.maxGuests || 1
   );
+
+  const departure = useMemo(
+    () => addDays(arrival, active.nights),
+    [arrival, active.nights]
+  );
+
+  const included = active.addOnIds;
+
+  const selectedIds = [
+    ...included,
+    ...extraIds.filter(
+      (id) => !included.includes(id)
+    ),
+  ];
 
   const quote = stay
     ? getQuote({
         accommodationId: stay.id,
-        checkIn,
-        checkOut,
-        guests: validGuests,
-        addOnIds: selected.addons,
+        checkIn: arrival,
+        checkOut: departure,
+        guests,
+        addOnIds: selectedIds,
       })
     : {
         ok: false,
-        error: "Accommodation is unavailable in the catalog.",
+        error: "Residence not found.",
       };
 
-  const visible = PACKAGES.filter(
-    (item) => filter === "all" || item.category === filter
+  const visible = JOURNEY_PACKAGES.filter(
+    (p) =>
+      filter === "all" ||
+      p.category === filter
   );
 
-  function selectPackage(item) {
-    setSelectedId(item.id);
-    setGuests(item.guests);
+  useEffect(() => {
+    document.title = "The Escape Editions | YOUR STAY.";
 
-    document.getElementById("ys4-package-builder")
+    return () => {
+      document.title = "YOUR STAY.";
+    };
+  }, []);
+
+  function selectPackage(item) {
+    setActiveId(item.id);
+    setPeople(item.guests);
+    setExtraIds([]);
+
+    document
+      .getElementById("ar3-package-composer")
       ?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
+        behavior: window.matchMedia(
+          "(prefers-reduced-motion: reduce)"
+        ).matches
+          ? "auto"
+          : "smooth",
+        block: "start",
       });
+  }
+
+  function toggleExtra(id) {
+    setExtraIds((old) =>
+      old.includes(id)
+        ? old.filter((x) => x !== id)
+        : [...old, id]
+    );
   }
 
   function continueBooking() {
     if (!quote.ok || !stay) return;
 
-    const params = new URLSearchParams({
-      stay: stay.id,
-      checkIn,
-      checkOut,
-      guests: String(validGuests),
-      addOns: selected.addons.join(","),
-    });
-
-    navigate(`/booking?${params.toString()}`);
+    navigate(
+      bookingHref({
+        stayId: stay.id,
+        checkIn: arrival,
+        checkOut: departure,
+        guests,
+        addOnIds: selectedIds,
+        packageId: active.id,
+      })
+    );
   }
 
   return (
-    <div className="ys4-page">
-      <section className="ys4-hero ys4-hero--packages">
-        <img
-          src={PHOTOS.hero}
-          alt="Illustrative tropical resort and swimming pool"
-        />
+    <div className="ar3 ar3-packages">
+      {/* EDITORIAL COVER */}
 
-        <div className="ys4-hero__shade" />
+      <section className="ar3-edition-hero">
+        <div className="ar3-edition-hero__image">
+          <img
+            src={PHOTOS.terrace}
+            alt="Illustrative warm tropical resort terrace"
+          />
 
-        <div className="ys4-container ys4-hero__content">
-          <span className="ys4-eyebrow ys4-eyebrow--light">
-            YOUR STAY / CURATED ESCAPES
+          <div className="ar3-edition-hero__vertical">
+            THE UNHURRIED ATLAS — EDITION 04
+          </div>
+        </div>
+
+        <div className="ar3-edition-hero__copy">
+          <span className="ar3-overline">
+            VOL. 04 / CURATED TRAVEL EXPERIENCES
           </span>
 
+          <div
+            className="ar3-edition-hero__star"
+            aria-hidden="true"
+          >
+            ✳
+          </div>
+
           <h1>
-            More than<br />
-            a place to <em>stay.</em>
+            Little journeys, <em>beautifully</em> considered.
           </h1>
 
           <p>
-            Thoughtfully paired accommodations and experiences.
-            Find a little more of what makes your getaway yours.
+            Not just accommodation. A collection of
+            imagined moments, thoughtfully paired into
+            escapes worth making time for.
           </p>
 
-          <a className="ys4-button ys4-button--light" href="#ys4-packages">
-            Explore the packages <ArrowRight size={17} />
+          <a
+            href="#ar3-editions"
+            className="ar3-underlined"
+          >
+            EXPLORE THE FOUR EDITIONS
+            <ArrowDownRight size={19} />
           </a>
-        </div>
 
-        <div className="ys4-hero__index">
-          THE COLLECTION — 01 / 04
+          <div className="ar3-edition-hero__counter">
+            <b>04</b>
+            <span>
+              ESCAPES / ONE WAY TO SLOW DOWN
+            </span>
+          </div>
         </div>
       </section>
 
+      {/* THE EDITION INDEX */}
+
       <section
-        className="ys4-section ys4-container"
-        id="ys4-packages"
+        className="ar3-edition-intro ar3-container"
+        id="ar3-editions"
       >
-        <div className="ys4-section-heading">
-          <div>
-            <span className="ys4-eyebrow">
-              DESIGNED AROUND YOUR MOMENTS
-            </span>
+        <Reveal>
+          <span className="ar3-overline">
+            01 / THE CURATOR'S SELECTION
+          </span>
 
-            <h2 className="ys4-title">
-              The escape <em>collection.</em>
-            </h2>
-          </div>
+          <h2>
+            Collect moments, <em>not miles.</em>
+          </h2>
+        </Reveal>
 
-          <p>
-            Every stay is different. Find the setting,
-            atmosphere and rhythm that feels right for you.
-          </p>
-        </div>
-
-        <div
-          className="ys4-filters"
-          role="group"
-          aria-label="Filter packages"
-        >
-          {FILTERS.map((item) => (
-            <button
-              type="button"
-              key={item.id}
-              className={filter === item.id ? "is-active" : ""}
-              aria-pressed={filter === item.id}
-              onClick={() => setFilter(item.id)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="ys4-package-grid">
-          {visible.map((item) => {
-            const accommodation = accommodations.find(
-              (stayItem) => stayItem.id === item.stayId
-            );
-
-            const isSelected = selectedId === item.id;
-
-            return (
-              <article
-                key={item.id}
-                className={`ys4-package-card ${
-                  isSelected ? "is-selected" : ""
-                }`}
-              >
-                <div className="ys4-package-card__image">
-                  <img
-                    src={item.image}
-                    alt={`Illustrative ${item.name} resort package`}
-                    loading="lazy"
-                  />
-
-                  <span>{item.number} / YOUR STAY</span>
-                </div>
-
-                <div className="ys4-package-card__body">
-                  <span className="ys4-eyebrow">{item.label}</span>
-                  <h3>{item.name}</h3>
-                  <p>{item.description}</p>
-
-                  <div className="ys4-package-meta">
-                    <span>
-                      <CalendarDays size={15} />
-                      {item.nights} nights
-                    </span>
-
-                    <span>
-                      <Users size={15} />
-                      {item.guests} guests
-                    </span>
-                  </div>
-
-                  <div className="ys4-card-divider" />
-
-                  <div className="ys4-package-card__bottom">
-                    <span>
-                      <small>Accommodation rate from</small>
-                      <strong>
-                        {formatPeso(
-                          (accommodation?.nightlyRate || 0) *
-                          item.nights
-                        )}
-                      </strong>
-                      <small>Excludes selected add-ons</small>
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={() => selectPackage(item)}
-                      aria-pressed={isSelected}
-                    >
-                      {isSelected ? "Selected" : "Explore"}
-                      <ArrowUpRight size={17} />
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-
-        <p className="ys4-fineprint">
-          Package descriptions and photographs are illustrative.
-          Exact demo totals are calculated below using the
-          current booking engine.
+        <p>
+          Each composition pairs a real demo-engine
+          accommodation with selected extras.
+          The quote always uses standard rates:
+          there are no invented package discounts.
         </p>
       </section>
 
-      <section
-        className="ys4-package-builder"
-        id="ys4-package-builder"
+      <div
+        className="ar3-package-tabs ar3-container"
+        role="group"
+        aria-label="Filter curated escapes"
       >
-        <div className="ys4-container ys4-builder-grid">
-          <div className="ys4-builder-copy">
-            <span className="ys4-eyebrow ys4-eyebrow--light">
-              MAKE YOUR ESCAPE YOURS
+        {TABS.map((tab) => (
+          <button
+            type="button"
+            key={tab.id}
+            aria-pressed={filter === tab.id}
+            className={
+              filter === tab.id
+                ? "is-current"
+                : ""
+            }
+            onClick={() => setFilter(tab.id)}
+          >
+            {tab.label}
+            <span>↗</span>
+          </button>
+        ))}
+      </div>
+
+      {/* ALTERNATING ARCHITECTURAL EDITIONS */}
+
+      <section
+        className="ar3-edition-list ar3-container"
+        aria-label="Curated escape editions"
+      >
+        {visible.map((item, idx) => {
+          const residence = accommodations.find(
+            (s) => s.id === item.stayId
+          );
+
+          const entryQuote = residence
+            ? getQuote({
+                accommodationId: residence.id,
+                checkIn: arrival,
+                checkOut: addDays(
+                  arrival,
+                  item.nights
+                ),
+                guests: item.guests,
+                addOnIds: item.addOnIds,
+              })
+            : null;
+
+          return (
+            <Reveal
+              as="article"
+              className={`ar3-edition-row ar3-edition-row--${idx % 2}`}
+              key={item.id}
+              delay={(idx % 2) * 100}
+            >
+              <div className="ar3-edition-row__media">
+                <img
+                  src={item.image}
+                  alt={`Illustrative ${item.title} retreat`}
+                  loading="lazy"
+                />
+
+                <span>
+                  THE ESCAPE EDITION / {item.number}
+                </span>
+
+                <i aria-hidden="true" />
+              </div>
+
+              <div className="ar3-edition-row__body">
+                <span className="ar3-overline">
+                  {item.kicker}
+                  {" / "}
+                  {residence?.category.toUpperCase()}
+                </span>
+
+                <h3>{item.title}</h3>
+
+                <p className="ar3-edition-row__subtitle">
+                  {item.subtitle}
+                </p>
+
+                <p>{item.note}</p>
+
+                <div className="ar3-edition-row__facts">
+                  <span>
+                    <CalendarDays size={15} />
+                    {item.nights} NIGHTS
+                  </span>
+
+                  <span>
+                    <Users size={15} />
+                    {item.guests} GUESTS
+                  </span>
+
+                  <span>
+                    <MapPin size={15} />
+                    {getZone(
+                      residence?.zoneId
+                    )?.label}
+                  </span>
+                </div>
+
+                <div className="ar3-edition-row__rate">
+                  <div>
+                    <small>
+                      STANDARD DEMO QUOTE /
+                      SELECTED DATES
+                    </small>
+
+                    <strong>
+                      {entryQuote?.ok
+                        ? formatPeso(entryQuote.total)
+                        : "CHECK DATES"}
+                    </strong>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      selectPackage(item)
+                    }
+                  >
+                    PERSONALIZE EDITION
+                    <ArrowUpRight size={18} />
+                  </button>
+                </div>
+              </div>
+            </Reveal>
+          );
+        })}
+      </section>
+
+      {/* INTERACTIVE ESCAPE COMPOSER */}
+
+      <section
+        className="ar3-composer"
+        id="ar3-package-composer"
+      >
+        <CoastalContours pale />
+
+        <div className="ar3-container ar3-composer__grid">
+          <div className="ar3-composer__art">
+            <span className="ar3-overline">
+              02 / THE ESCAPE COMPOSER
             </span>
 
-            <h2 className="ys4-title">
-              All the little<br />
-              <em>details matter.</em>
+            <h2>
+              The details make it <em>yours.</em>
             </h2>
 
             <p>
-              Preview your dates, guests and inclusions
-              before continuing to your demo reservation.
+              Set a date, bring your favorite people
+              and shape the rest of the journey around
+              your chosen edition.
             </p>
 
-            <div className="ys4-builder-photo">
+            <div
+              className="ar3-composer__photo"
+              key={active.id}
+            >
               <img
-                src={selected.image}
-                alt={`Illustrative ${selected.name}`}
+                src={active.image}
+                alt={`Illustrative ${active.title} experience`}
               />
 
               <span>
-                <Sparkles size={17} />
-                YOUR STAY SIGNATURE COLLECTION
+                EDITION {active.number} /
+                {active.kicker}
               </span>
             </div>
+
+            <TideCompass />
           </div>
 
-          <div className="ys4-builder-panel">
-            <span className="ys4-eyebrow">YOUR SELECTED PACKAGE</span>
-            <h3>{selected.name}</h3>
-            <p>{selected.subtitle}</p>
+          <div className="ar3-composer__panel">
+            <div className="ar3-composer__topline">
+              <span>
+                CURATED STAY / {active.number}
+              </span>
 
-            <div className="ys4-inclusions">
-              {selected.inclusions.map((item) => (
-                <div key={item}>
-                  <Check size={17} />
-                  <span>{item}</span>
+              <Compass size={23} />
+            </div>
+
+            <h3>{active.title}</h3>
+
+            <p className="ar3-composer__subtitle">
+              {active.subtitle}
+            </p>
+
+            <div className="ar3-inclusion-list">
+              {active.inclusions.map((text, i) => (
+                <div key={text}>
+                  <span>0{i + 1}</span>
+                  <strong>{text}</strong>
+                  <Check size={16} />
                 </div>
               ))}
             </div>
 
-            <div className="ys4-card-divider" />
+            {/* LIVE PACKAGE DATE CONTROLS */}
 
-            <div className="ys4-form-row">
-              <label className="ys4-field">
-                <span>CHECK-IN DATE</span>
+            <div className="ar3-composer__inputs">
+              <label>
+                YOUR ARRIVAL
                 <input
                   type="date"
                   min={dateAfter(0)}
-                  value={checkIn}
-                  onChange={(event) =>
-                    setCheckIn(event.target.value)
+                  value={arrival}
+                  onChange={(e) =>
+                    setArrival(e.target.value)
                   }
                 />
               </label>
 
-              <label className="ys4-field">
-                <span>CHECK-OUT</span>
+              <label>
+                DEPARTURE / FIXED EDITION
                 <input
                   type="date"
-                  value={checkOut}
                   readOnly
+                  value={departure}
                 />
+              </label>
+
+              <label className="full">
+                THE PEOPLE
+
+                <select
+                  value={guests}
+                  onChange={(e) =>
+                    setPeople(
+                      Number(e.target.value)
+                    )
+                  }
+                >
+                  {Array.from(
+                    {
+                      length:
+                        stay?.maxGuests || 1,
+                    },
+                    (_, i) => i + 1
+                  ).map((n) => (
+                    <option key={n} value={n}>
+                      {n}{" "}
+                      {n === 1
+                        ? "guest"
+                        : "guests"}
+                    </option>
+                  ))}
+                </select>
               </label>
             </div>
 
-            <label className="ys4-field">
-              <span>NUMBER OF GUESTS</span>
+            {/* OPTIONAL EXPERIENCES */}
 
-              <select
-                value={validGuests}
-                onChange={(event) =>
-                  setGuests(Number(event.target.value))
-                }
-              >
-                {Array.from(
-                  { length: stay?.maxGuests || 1 },
-                  (_, index) => index + 1
-                ).map((number) => (
-                  <option key={number} value={number}>
-                    {number} {number === 1 ? "Guest" : "Guests"}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <div className="ar3-composer__extras">
+              <span className="ar3-overline">
+                ANOTHER LITTLE THING?
+              </span>
 
-            <div className="ys4-summary">
-              {quote.ok ? (
-                <>
+              {ADD_ONS.filter(
+                (a) =>
+                  !included.includes(a.id)
+              ).map((addon) => (
+                <label key={addon.id}>
+                  <input
+                    type="checkbox"
+                    checked={extraIds.includes(
+                      addon.id
+                    )}
+                    onChange={() =>
+                      toggleExtra(addon.id)
+                    }
+                  />
+
+                  <span>
+                    <b>{addon.name}</b>
+                    <small>
+                      {addon.description}
+                    </small>
+                  </span>
+
+                  <strong>
+                    {addon.price
+                      ? `+${formatPeso(
+                          addon.price
+                        )}`
+                      : "REQUEST"}
+                  </strong>
+                </label>
+              ))}
+            </div>
+
+            {/* ACTUAL ENGINE QUOTE */}
+
+            {quote.ok ? (
+              <div className="ar3-composer__total">
+                <div>
+                  <span>
+                    VILLA / {quote.nights} NIGHTS
+                  </span>
+
+                  <strong>
+                    {formatPeso(
+                      quote.nightlySubtotal
+                    )}
+                  </strong>
+                </div>
+
+                {quote.extraGuestTotal > 0 && (
                   <div>
-                    <span>Accommodation</span>
+                    <span>ADDITIONAL GUESTS</span>
+
                     <strong>
-                      {formatPeso(quote.nightlySubtotal)}
+                      {formatPeso(
+                        quote.extraGuestTotal
+                      )}
                     </strong>
                   </div>
+                )}
 
-                  {quote.extraGuestTotal > 0 && (
-                    <div>
-                      <span>Additional guests</span>
-                      <strong>
-                        {formatPeso(quote.extraGuestTotal)}
-                      </strong>
-                    </div>
-                  )}
+                {quote.addOnTotal > 0 && (
+                  <div>
+                    <span>CURATED EXPERIENCES</span>
 
-                  {quote.addOnTotal > 0 && (
-                    <div>
-                      <span>Included package add-ons</span>
-                      <strong>
-                        {formatPeso(quote.addOnTotal)}
-                      </strong>
-                    </div>
-                  )}
-
-                  <div className="ys4-summary__total">
-                    <span>Estimated package total</span>
-                    <strong>{formatPeso(quote.total)}</strong>
+                    <strong>
+                      {formatPeso(
+                        quote.addOnTotal
+                      )}
+                    </strong>
                   </div>
-                </>
-              ) : (
-                <p className="ys4-error" role="status">
-                  {quote.error}
-                </p>
-              )}
-            </div>
+                )}
+
+                <div>
+                  <span>
+                    TOTAL / DEMO ESTIMATE
+                  </span>
+
+                  <strong>
+                    {formatPeso(quote.total)}
+                  </strong>
+                </div>
+              </div>
+            ) : (
+              <p
+                className="ar3-error"
+                role="status"
+              >
+                {quote.error}
+              </p>
+            )}
 
             <button
+              className="ar3-main-action"
               type="button"
-              className="ys4-button ys4-button--full"
-              disabled={!quote.ok}
               onClick={continueBooking}
+              disabled={!quote.ok}
             >
-              Continue to booking <ArrowRight size={18} />
+              COMPOSE MY RESERVATION
+              <ArrowUpRight size={19} />
             </button>
 
-            <div className="ys4-demo-notice">
-              <ShieldCheck size={17} />
-              Concept booking only. No payment or actual resort
-              reservation is made.
-            </div>
+            <p className="ar3-disclosure">
+              <ShieldCheck size={16} />
+              {DEMO_NOTICES.booking}{" "}
+              {DEMO_NOTICES.payment}
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="ys4-container ys4-section ys4-ending">
-        <span className="ys4-eyebrow">EXPLORE A LITTLE MORE</span>
+      {/* OUTRO */}
 
-        <h2 className="ys4-title">
-          A beautiful stay begins <em>somewhere.</em>
-        </h2>
+      <section className="ar3-packages-finale">
+        <div className="ar3-packages-finale__image">
+          <img
+            src={PHOTOS.escape}
+            alt="Illustrative resort architecture and greenery"
+            loading="lazy"
+          />
+        </div>
 
-        <p>
-          Prefer to create your own escape?
-          Explore our full collection of villas and suites.
-        </p>
+        <div>
+          <span className="ar3-overline">
+            THE STAY IS ONLY THE BEGINNING
+          </span>
 
-        <Link className="ys4-button" to="/stays">
-          Discover all stays <ArrowUpRight size={18} />
-        </Link>
+          <h2>
+            A place for <em>the unscheduled.</em>
+          </h2>
+
+          <Link to="/stays">
+            EXPLORE INDIVIDUAL RESIDENCES
+            <ArrowRight size={18} />
+          </Link>
+        </div>
       </section>
     </div>
   );

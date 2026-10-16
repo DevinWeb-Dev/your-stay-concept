@@ -1,0 +1,1704 @@
+/* =====================================================
+   YOUR STAY. / ARCHITECTURAL STAFF FINISH — BATCH 05
+   The Arrival Ledger · Guest Atlas · Configuration Vault
+
+   Extend (do not replace)
+   stay-operations-architectural.css.
+===================================================== */
+
+.op4-shell .op5-page {
+  --f-ink: #17352e;
+  --f-dark: #112922;
+  --f-leaf: #476f5d;
+  --f-sand: #e1dcad;
+  --f-ivory: #faf9f2;
+  --f-mist: #e1e9dd;
+  --f-line: #d3d8cc;
+  --f-clay: #a36e52;
+  --f-muted: #62756c;
+  --f-serif: 'Italiana', Georgia, serif;
+  --f-mono: 'DM Mono', monospace;
+  --f-ease: cubic-bezier(.22, 1, .36, 1);
+
+  min-width: 0;
+  gap: 26px;
+}
+
+.op4-shell .op5-page :is(
+  a,
+  button,
+  input,
+  select,
+  textarea
+):focus-visible {
+  outline: 2px solid var(--f-clay);
+  outline-offset: 3px;
+}
+
+.op4-shell .op5-page :is(h1, h2, h3) {
+  text-wrap: balance;
+  overflow-wrap: anywhere;
+}
+
+.op4-shell .op5-page button {
+  cursor: pointer;
+}
+
+.op4-shell .op5-page button:disabled {
+  cursor: not-allowed;
+  opacity: .45;
+}
+
+.op4-shell .op5-page em {
+  font-weight: 400;
+}
+
+.op4-shell .op5-page :where(
+  p,
+  small,
+  span
+) {
+  overflow-wrap: anywhere;
+}
+
+/* =====================================================
+   01 / ARCHITECTURAL OPENING FRAMES
+===================================================== */
+
+.op5-res-hero,
+.op5-guest-hero,
+.op5-settings-hero {
+  display: grid;
+  grid-template-columns: 1.27fr .73fr;
+  min-height: 385px;
+  isolation: isolate;
+  background: var(--f-dark);
+  color: var(--f-ivory);
+  overflow: hidden;
+}
+
+.op5-res-hero-copy,
+.op5-guest-hero > div:first-child,
+.op5-settings-hero > div:first-child {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+
+  padding: clamp(33px, 4.3vw, 68px);
+  gap: 15px;
+  min-width: 0;
+}
+
+.op5-res-hero .op4-eyebrow,
+.op5-guest-hero .op4-eyebrow,
+.op5-settings-hero .op4-eyebrow {
+  color: var(--f-sand);
+}
+
+.op5-res-hero h1,
+.op5-guest-hero h1,
+.op5-settings-hero h1 {
+  position: relative;
+  z-index: 2;
+
+  margin: 8px 0;
+
+  font: 400 clamp(
+    60px,
+    6vw,
+    110px
+  )/1.025 var(--f-serif);
+
+  letter-spacing: -.063em;
+  max-width: 950px;
+}
+
+.op5-res-hero h1 em,
+.op5-guest-hero h1 em,
+.op5-settings-hero h1 em {
+  color: var(--f-sand);
+}
+
+.op5-res-hero p,
+.op5-guest-hero p,
+.op5-settings-hero p {
+  position: relative;
+  z-index: 2;
+
+  margin: 0;
+  max-width: 470px;
+
+  color: #c4d9cd;
+  font: 500 12px/1.9 var(--op-sans);
+}
+
+.op5-hero-links {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 15px;
+}
+
+.op5-hero-links a,
+.op5-guest-hero a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+
+  padding: 15px 17px;
+  background: var(--f-sand);
+  color: var(--f-ink);
+
+  font: 500 9px var(--f-mono);
+
+  transition:
+    transform .4s var(--f-ease),
+    background .3s;
+}
+
+.op5-hero-links a:nth-child(2) {
+  background: transparent;
+  color: #e5e7d9;
+  border: 1px solid #cdddc280;
+}
+
+.op5-hero-links a:hover,
+.op5-guest-hero a:hover {
+  transform: translateY(-3px);
+}
+
+.op5-guest-hero a {
+  margin-top: 10px;
+}
+
+/* =====================================================
+   02 / COASTAL MOTION GRAPHICS
+===================================================== */
+
+.op5-res-hero-art,
+.op5-guest-hero-art,
+.op5-settings-hero-graphic {
+  position: relative;
+  overflow: hidden;
+  min-height: 340px;
+  isolation: isolate;
+
+  background:
+    radial-gradient(
+      ellipse at 63% 45%,
+      #4d7561,
+      #1d4134 64%,
+      #163126
+    );
+}
+
+.op5-res-hero-art::before,
+.op5-guest-hero-art::before,
+.op5-settings-hero-graphic::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  opacity: .25;
+
+  background:
+    repeating-radial-gradient(
+      ellipse at 55% 50%,
+      transparent 0 24px,
+      #e6e7d0 25px 26px,
+      transparent 27px 57px
+    );
+
+  transform: rotate(-21deg);
+
+  animation:
+    op5-bathymetry
+    25s ease-in-out infinite alternate;
+}
+
+.op5-orbit {
+  position: absolute;
+  top: 21%;
+  left: 18%;
+
+  width: 50%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+
+  border: 1px solid #e2e9d57a;
+
+  animation:
+    op5-rotate
+    70s linear infinite;
+}
+
+.op5-orbit--a::before {
+  content: "";
+  position: absolute;
+  inset: 14%;
+  border: 1px dashed #e2e9d5aa;
+  border-radius: 50%;
+}
+
+.op5-orbit--a::after {
+  content: "";
+  position: absolute;
+  width: 12px;
+  height: 12px;
+
+  border-radius: 50%;
+  background: var(--f-sand);
+
+  top: -6px;
+  left: calc(50% - 6px);
+}
+
+.op5-orbit--b {
+  inset: 29% auto auto 27%;
+  width: 32%;
+  animation-direction: reverse;
+  animation-duration: 48s;
+}
+
+.op5-big-digit {
+  position: absolute;
+  inset: auto 0 -8% auto;
+
+  font: 400 clamp(
+    150px,
+    20vw,
+    350px
+  )/1 var(--f-serif);
+
+  color: #faf6d719;
+  letter-spacing: -.12em;
+}
+
+.op5-folio-stamp {
+  position: absolute;
+  bottom: 23px;
+  left: 25px;
+
+  font: 400 9px var(--f-mono);
+  color: #e0e5cb;
+}
+
+.op5-guest-hero-art {
+  display: grid;
+  place-items: center;
+}
+
+.op5-guest-hero-art > span {
+  position: relative;
+  z-index: 1;
+
+  font: 400 clamp(
+    115px,
+    15vw,
+    235px
+  )/1 var(--f-serif);
+
+  letter-spacing: -.09em;
+  color: #f6efc4;
+}
+
+.op5-guest-hero-art > i {
+  position: absolute;
+  inset: 16% 20%;
+
+  border: 1px solid #f0e9cf7a;
+  border-radius: 50%;
+
+  animation:
+    op5-rotate
+    42s linear infinite;
+}
+
+.op5-guest-hero-art > small {
+  position: absolute;
+  bottom: 23px;
+  left: 25px;
+
+  font: 500 9px var(--f-mono);
+  color: #e6e9d2;
+}
+
+.op5-settings-hero-graphic {
+  display: grid;
+  place-items: center;
+  color: var(--f-sand);
+}
+
+.op5-settings-hero-graphic > svg {
+  position: relative;
+  z-index: 1;
+
+  animation:
+    op5-gentle-sway
+    12s ease-in-out infinite alternate;
+}
+
+.op5-settings-hero-graphic > small {
+  position: absolute;
+  bottom: 25px;
+
+  font: 400 9px var(--f-mono);
+  color: #f7f1dd;
+}
+
+.op5-graphic-rings {
+  position: absolute;
+  width: 57%;
+  aspect-ratio: 1;
+
+  border: 1px solid #e2e9d57a;
+  border-radius: 50%;
+
+  box-shadow:
+    0 0 0 28px #faf5dd0a,
+    0 0 0 56px #faf5dd07;
+
+  animation:
+    op5-rotate
+    70s linear infinite;
+}
+
+@keyframes op5-bathymetry {
+  to {
+    transform:
+      translate3d(20px, -16px, 0)
+      rotate(-14deg)
+      scale(1.1);
+  }
+}
+
+@keyframes op5-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes op5-gentle-sway {
+  to {
+    transform: rotate(13deg);
+  }
+}
+
+/* =====================================================
+   03 / OPERATIONAL SUMMARY GRID
+===================================================== */
+
+.op5-overview-grid {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.op5-overview-grid > div {
+  display: grid;
+  align-content: space-between;
+  gap: 13px;
+  min-width: 0;
+
+  padding: clamp(17px, 2vw, 29px);
+  background: var(--f-ivory);
+  border: 1px solid var(--f-line);
+}
+
+.op5-overview-grid > div:nth-child(2) {
+  background: var(--f-mist);
+}
+
+.op5-overview-grid > div > span {
+  font: 500 9px/1.6 var(--f-mono);
+}
+
+.op5-overview-grid strong {
+  font: 400 clamp(
+    43px,
+    5vw,
+    80px
+  )/1 var(--f-serif);
+
+  letter-spacing: -.05em;
+  overflow-wrap: anywhere;
+}
+
+.op5-overview-grid strong.op5-stat-date {
+  font: 500 clamp(
+    17px,
+    2vw,
+    29px
+  )/1.1 var(--op-sans);
+
+  letter-spacing: -.04em;
+}
+
+.op5-overview-grid small {
+  color: var(--f-muted);
+  font: 500 10px/1.7 var(--op-sans);
+}
+
+/* =====================================================
+   04 / LEDGER + INDEX WORKSPACE
+===================================================== */
+
+.op5-workspace-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.35fr)
+    minmax(310px, .85fr);
+
+  align-items: start;
+  gap: 16px;
+}
+
+.op5-ledger,
+.op5-guest-directory,
+.op5-res-inspector,
+.op5-guest-inspector {
+  min-width: 0;
+}
+
+.op5-filter-strip {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  border-block: 1px solid var(--f-line);
+  margin-bottom: 19px;
+}
+
+.op5-filter-strip button {
+  display: grid;
+  flex: 1;
+  flex-shrink: 0;
+  justify-items: start;
+  gap: 9px;
+
+  min-width: 92px;
+  padding: 17px 11px;
+
+  border: 0;
+  border-right: 1px solid var(--f-line);
+  background: transparent;
+  color: var(--f-ink);
+  text-align: left;
+}
+
+.op5-filter-strip button:last-child {
+  border-right: 0;
+}
+
+.op5-filter-strip button.is-current {
+  background: var(--f-sand);
+}
+
+.op5-filter-strip button > b {
+  font: 400 32px/1 var(--f-serif);
+}
+
+.op5-filter-strip button > span {
+  font: 500 9px var(--f-mono);
+}
+
+.op5-search-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 15px;
+}
+
+.op5-search,
+.op5-mini-select {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+
+  min-height: 48px;
+  min-width: 0;
+  padding: 10px 13px;
+
+  border: 1px solid var(--f-line);
+  background: #f4f5ed;
+}
+
+.op5-search {
+  flex: 1;
+}
+
+.op5-search input {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--f-ink);
+  font-size: 11px;
+  outline: 0;
+}
+
+.op5-mini-select select {
+  min-width: 0;
+  max-width: 150px;
+  border: 0;
+  background: transparent;
+  color: var(--f-ink);
+  font: 500 10px var(--op-sans);
+}
+
+.op5-export-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  min-height: 48px;
+  padding: 10px 12px;
+
+  background: var(--f-ink);
+  border: 1px solid var(--f-ink);
+  color: white;
+  font: 500 9px var(--f-mono);
+}
+
+.op5-ledger-list,
+.op5-guest-list {
+  display: grid;
+  border-top: 1px solid var(--f-line);
+}
+
+.op5-booking-item {
+  display: grid;
+  grid-template-columns:
+    28px minmax(0, 1fr) auto 18px;
+  align-items: center;
+  gap: 12px;
+
+  min-width: 0;
+  padding: 19px 6px;
+
+  border: 0;
+  border-bottom: 1px solid var(--f-line);
+  background: transparent;
+  text-align: left;
+  color: var(--f-ink);
+
+  transition:
+    background .25s,
+    padding .25s;
+}
+
+.op5-booking-item.is-selected,
+.op5-booking-item:hover {
+  background: var(--f-mist);
+  padding-inline: 13px;
+}
+
+.op5-booking-number {
+  font: 500 9px var(--f-mono);
+  color: var(--f-clay);
+}
+
+.op5-booking-main {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.op5-booking-main > small {
+  font: 400 9px var(--f-mono);
+  color: var(--f-muted);
+}
+
+.op5-booking-main > strong {
+  font: 400 clamp(
+    24px,
+    2.6vw,
+    39px
+  )/1.08 var(--f-serif);
+}
+
+.op5-booking-main > span {
+  font: 500 10px/1.6 var(--op-sans);
+  color: var(--f-muted);
+}
+
+.op5-booking-meta {
+  display: grid;
+  justify-items: end;
+  gap: 9px;
+}
+
+.op5-booking-meta > strong {
+  font: 600 12px var(--op-sans);
+  white-space: nowrap;
+}
+
+.op5-stamp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+
+  border: 1px solid #d3d9c7;
+  background: #e7ebe0;
+  color: #41644c;
+
+  font: 500 8px/1.35 var(--f-mono);
+  letter-spacing: .01em;
+}
+
+.op5-stamp--checked_in {
+  background: #cddfd0;
+  border-color: #b4cbb8;
+  color: #276343;
+}
+
+.op5-stamp--checked_out {
+  background: #e1e3e1;
+  border-color: #ccd3ce;
+  color: #657267;
+}
+
+.op5-stamp--cancelled {
+  background: #f6e6de;
+  border-color: #e5c7b9;
+  color: #9b5948;
+}
+
+.op5-no-data {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 35px 12px;
+}
+
+.op5-no-data h3 {
+  margin: 0;
+  font: 400 38px var(--f-serif);
+}
+
+.op5-no-data p {
+  color: var(--f-muted);
+  font-size: 12px;
+}
+
+.op5-no-data button {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px;
+
+  background: var(--f-ink);
+  color: white;
+  border: 0;
+
+  font: 500 9px var(--f-mono);
+}
+
+/* =====================================================
+   05 / SELECTED RESERVATION INSPECTOR
+===================================================== */
+
+.op5-res-inspector,
+.op5-guest-inspector {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.op5-inspector-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--f-line);
+}
+
+.op5-inspector-top button {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+
+  background: transparent;
+  border: 1px solid var(--f-line);
+}
+
+.op5-inspector-empty {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 17px;
+
+  min-height: 390px;
+  padding: 35px;
+}
+
+.op5-inspector-empty > svg {
+  color: var(--f-clay);
+}
+
+.op5-inspector-empty h2 {
+  margin: 0;
+  font: 400 clamp(
+    49px,
+    4vw,
+    68px
+  )/1.06 var(--f-serif);
+}
+
+.op5-inspector-empty h2 em {
+  color: var(--f-clay);
+}
+
+.op5-inspector-empty p {
+  max-width: 300px;
+  color: var(--f-muted);
+  font: 500 12px/1.75 var(--op-sans);
+}
+
+.op5-inspector-photo {
+  position: relative;
+  height: 245px;
+  background: #7e9e87;
+  overflow: hidden;
+}
+
+.op5-inspector-photo img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.op5-inspector-photo::after {
+  content: "";
+  position: absolute;
+  inset: 50% 0 0;
+
+  background:
+    linear-gradient(
+      transparent,
+      #102b248b
+    );
+}
+
+.op5-inspector-photo > span {
+  position: absolute;
+  z-index: 1;
+  bottom: 15px;
+  left: 17px;
+  right: 17px;
+
+  color: white;
+  font: 500 9px/1.5 var(--f-mono);
+}
+
+.op5-inspector-content {
+  display: grid;
+  gap: 15px;
+  padding: clamp(18px, 2.5vw, 32px);
+}
+
+.op5-inspector-content > .op5-stamp {
+  justify-self: start;
+}
+
+.op5-inspector-content > h2 {
+  margin: 0;
+  font: 400 clamp(
+    47px,
+    4.8vw,
+    74px
+  )/1.02 var(--f-serif);
+}
+
+.op5-email {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 0;
+
+  color: var(--f-muted);
+  font: 500 11px/1.6 var(--op-sans);
+}
+
+.op5-trip-line {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 9px;
+
+  padding: 22px 0;
+  border-block: 1px solid var(--f-ink);
+}
+
+.op5-trip-line > div:not(
+  .op5-trip-passage
+) {
+  display: grid;
+  gap: 9px;
+}
+
+.op5-trip-line > div > span {
+  color: var(--f-muted);
+  font: 400 9px var(--f-mono);
+}
+
+.op5-trip-line strong {
+  font: 400 clamp(
+    21px,
+    2.3vw,
+    36px
+  )/1.1 var(--f-serif);
+}
+
+.op5-trip-passage {
+  color: var(--f-clay);
+  font: 400 11px var(--f-mono);
+  letter-spacing: -.1em;
+}
+
+.op5-folio-facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.op5-folio-facts > div {
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+  min-width: 0;
+  background: var(--f-mist);
+}
+
+.op5-folio-facts span {
+  font: 400 9px var(--f-mono);
+  color: var(--f-muted);
+}
+
+.op5-folio-facts strong {
+  font: 600 12px/1.4 var(--op-sans);
+}
+
+.op5-extras,
+.op5-action-panel {
+  display: grid;
+  justify-items: start;
+  gap: 11px;
+
+  padding-top: 17px;
+  border-top: 1px solid var(--f-line);
+}
+
+.op5-extras > span,
+.op5-action-panel > span {
+  color: var(--f-muted);
+  font: 500 9px var(--f-mono);
+}
+
+.op5-extras strong {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font: 600 11px var(--op-sans);
+}
+
+.op5-extras small,
+.op5-action-panel p {
+  color: var(--f-muted);
+  font: 500 11px/1.7 var(--op-sans);
+}
+
+.op5-action-panel > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+
+  width: 100%;
+  min-height: 47px;
+  padding: 14px;
+
+  border: 1px solid var(--f-ink);
+  font: 500 9px var(--f-mono);
+}
+
+.op5-action-primary {
+  color: white;
+  background: var(--f-ink);
+}
+
+.op5-action-danger {
+  color: #935140;
+  border-color: #b18f81 !important;
+  background: #f7e9e1;
+}
+
+.op5-inspector-note {
+  display: flex;
+  gap: 10px;
+  align-items: start;
+
+  padding-top: 15px;
+  border-top: 1px dashed var(--f-line);
+
+  color: var(--f-muted);
+  font: 400 10px/1.65 var(--f-mono);
+}
+
+.op5-inspector-note svg {
+  flex-shrink: 0;
+}
+
+.op5-privacy-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+
+  color: var(--f-muted);
+  font: 400 10px/1.8 var(--f-mono);
+}
+
+.op5-privacy-note svg {
+  flex-shrink: 0;
+}
+
+/* =====================================================
+   06 / GUEST RELATIONSHIP FOLIOS
+===================================================== */
+
+.op5-guest-choice {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+
+  width: 100%;
+  min-height: 111px;
+  padding: 18px 7px;
+
+  border: 0;
+  border-bottom: 1px solid var(--f-line);
+  background: transparent;
+
+  text-align: left;
+  color: var(--f-ink);
+  transition: background .3s;
+}
+
+.op5-guest-choice:hover,
+.op5-guest-choice.is-selected {
+  background: var(--f-mist);
+}
+
+.op5-guest-avatar {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+
+  width: 61px;
+  height: 61px;
+  border-radius: 50%;
+
+  background: var(--f-dark);
+  color: var(--f-sand);
+  font: 400 41px var(--f-serif);
+}
+
+.op5-guest-identity {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 6px;
+}
+
+.op5-guest-identity small {
+  color: var(--f-clay);
+  font: 400 9px var(--f-mono);
+}
+
+.op5-guest-identity strong {
+  font: 400 clamp(
+    27px,
+    3vw,
+    44px
+  )/1.05 var(--f-serif);
+}
+
+.op5-guest-identity > span {
+  color: var(--f-muted);
+  font: 500 10px var(--op-sans);
+}
+
+.op5-export-zone {
+  display: grid;
+  gap: 14px;
+  margin-top: 23px;
+  padding: 20px;
+
+  border: 1px dashed #9fae9f;
+  background: #f2f4ec;
+}
+
+.op5-export-zone label,
+.op5-checkline {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  font: 500 11px/1.6 var(--op-sans);
+  cursor: pointer;
+}
+
+.op5-export-zone input,
+.op5-checkline input {
+  accent-color: var(--f-ink);
+  margin-top: 2px;
+}
+
+.op5-export-zone small,
+.op5-archive small {
+  color: var(--f-muted);
+  font: 400 9px/1.7 var(--f-mono);
+}
+
+.op5-export-full {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 15px;
+
+  background: var(--f-ink);
+  color: white;
+  border: 0;
+
+  font: 500 9px var(--f-mono);
+}
+
+.op5-guest-profile-heading {
+  display: flex;
+  gap: 19px;
+  align-items: center;
+  padding: 26px;
+  background: var(--f-mist);
+}
+
+.op5-guest-profile-monogram {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+
+  border: 1px solid var(--f-leaf);
+  font: 400 65px var(--f-serif);
+}
+
+.op5-guest-profile-heading > div {
+  min-width: 0;
+}
+
+.op5-guest-profile-heading > div > span {
+  font: 400 9px var(--f-mono);
+}
+
+.op5-guest-profile-heading h2 {
+  font: 400 clamp(
+    36px,
+    4vw,
+    65px
+  )/1.05 var(--f-serif);
+  margin: 8px 0;
+}
+
+.op5-guest-profile-heading p {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+
+  color: var(--f-muted);
+  margin: 0;
+  font: 500 10px var(--op-sans);
+}
+
+.op5-profile-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+  padding: 22px;
+}
+
+.op5-profile-metrics > div {
+  display: grid;
+  gap: 7px;
+  padding: 17px;
+
+  background: var(--f-ivory);
+  border: 1px solid var(--f-line);
+}
+
+.op5-profile-metrics > div:last-child {
+  grid-column: 1 / -1;
+  background: var(--f-mist);
+}
+
+.op5-profile-metrics span {
+  font: 400 9px var(--f-mono);
+}
+
+.op5-profile-metrics strong {
+  font: 400 49px/1 var(--f-serif);
+}
+
+.op5-profile-metrics .op5-compact-money {
+  font: 600 24px var(--op-sans);
+}
+
+.op5-history-heading {
+  padding: 0 22px;
+}
+
+.op5-history-heading h3 {
+  margin: 9px 0 15px;
+  font: 400 39px/1.1 var(--f-serif);
+}
+
+.op5-guest-history {
+  display: grid;
+  padding: 0 22px 15px;
+}
+
+.op5-history-item {
+  display: grid;
+  grid-template-columns:
+    30px minmax(0, 1fr);
+  gap: 13px;
+
+  padding: 17px 0;
+  border-top: 1px solid var(--f-line);
+}
+
+.op5-history-axis {
+  display: flex;
+  justify-content: center;
+
+  width: 26px;
+  height: 26px;
+  padding-top: 6px;
+
+  border: 1px solid var(--f-clay);
+  border-radius: 50%;
+
+  font: 400 9px var(--f-mono);
+}
+
+.op5-history-item > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.op5-history-item small {
+  color: var(--f-muted);
+  font: 400 9px var(--f-mono);
+}
+
+.op5-history-item strong {
+  font: 400 25px/1.1 var(--f-serif);
+}
+
+.op5-history-item p {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin: 0;
+  font: 500 10px var(--op-sans);
+}
+
+.op5-history-bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+}
+
+.op5-history-bottom > b {
+  font: 600 11px var(--op-sans);
+}
+
+.op5-guest-inspector > .op4-text-action {
+  margin: 0 22px 25px;
+}
+
+/* =====================================================
+   07 / THE CONFIGURATION VAULT
+===================================================== */
+
+.op5-settings-nav {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  border-block: 1px solid var(--f-line);
+}
+
+.op5-settings-nav > a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+
+  padding: 19px 22px;
+  flex: 1;
+  min-width: 188px;
+
+  background: var(--f-ivory);
+  border-right: 1px solid var(--f-line);
+  font: 500 9px var(--f-mono);
+}
+
+.op5-settings-nav > a:hover {
+  background: var(--f-sand);
+}
+
+.op5-settings-grid {
+  display: grid;
+  grid-template-columns:
+    minmax(0, 1.2fr)
+    minmax(305px, .8fr);
+
+  gap: 16px;
+  align-items: start;
+}
+
+.op5-settings-primary,
+.op5-settings-aside {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.op5-settings-section,
+.op5-vault,
+.op5-archive,
+.op5-danger {
+  scroll-margin-top: 32px;
+}
+
+.op5-settings-section h2,
+.op5-vault h2,
+.op5-archive h2,
+.op5-danger h2 {
+  font-size: clamp(
+    37px,
+    3.8vw,
+    66px
+  );
+}
+
+.op5-settings-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+  margin-top: 25px;
+}
+
+.op5-settings-form .op5-field-full {
+  grid-column: 1 / -1;
+}
+
+.op5-settings-form .op4-field :is(
+  input,
+  textarea
+) {
+  min-height: 49px;
+  font-size: 12px;
+}
+
+.op5-settings-form code {
+  color: var(--f-clay);
+}
+
+.op5-draft-actions {
+  grid-column: 1 / -1;
+
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.op5-draft-actions > span {
+  color: var(--f-leaf);
+  font: 500 9px var(--f-mono);
+}
+
+.op5-draft-actions > span.is-dirty {
+  color: #a35d49;
+}
+
+.op5-secondary-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px;
+
+  border: 1px solid var(--f-line);
+  background: transparent;
+  color: var(--f-ink);
+
+  font: 500 9px var(--f-mono);
+}
+
+.op5-brand-preview {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+
+  margin-top: 28px;
+  padding: 27px;
+
+  background: var(--f-dark);
+  color: #faf7ee;
+}
+
+.op5-brand-preview > div {
+  display: flex;
+  gap: 13px;
+  align-items: center;
+}
+
+.op5-brand-preview > div > span,
+.op5-brand-preview > small {
+  font: 400 9px/1.8 var(--f-mono);
+  color: var(--f-sand);
+}
+
+.op5-brand-preview h3 {
+  margin: 7px 0 0;
+
+  font: 400 clamp(
+    48px,
+    5vw,
+    77px
+  )/1.02 var(--f-serif);
+}
+
+.op5-brand-preview p {
+  max-width: 450px;
+  color: #d5e1d4;
+  font: 400 14px/1.8 var(--op-sans);
+}
+
+.op5-policy-list {
+  display: grid;
+  border-top: 1px solid var(--f-line);
+  margin-top: 21px;
+}
+
+.op5-policy-list > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 13px;
+
+  padding: 14px 0;
+  border-bottom: 1px solid var(--f-line);
+}
+
+.op5-policy-list span {
+  font: 500 10px/1.5 var(--op-sans);
+}
+
+.op5-policy-list strong {
+  font: 600 11px/1.6 var(--op-sans);
+}
+
+.op5-inline-disclaimer {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+
+  margin: 20px 0 0;
+  color: var(--f-muted);
+
+  font: 400 10px/1.7 var(--f-mono);
+}
+
+.op5-inline-disclaimer svg {
+  flex-shrink: 0;
+}
+
+.op5-vault h2 em {
+  color: var(--f-clay);
+}
+
+.op5-connection-stamp {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+
+  margin-top: 23px;
+  padding: 15px;
+  background: var(--f-mist);
+}
+
+.op5-connection-stamp > span {
+  display: grid;
+  gap: 5px;
+  font: 600 12px var(--op-sans);
+}
+
+.op5-connection-stamp small {
+  font: 400 9px var(--f-mono);
+}
+
+.op5-archive {
+  display: grid;
+  gap: 14px;
+}
+
+.op5-archive .op4-panel-head {
+  margin: 0;
+}
+
+.op5-archive > p,
+.op5-danger > p {
+  margin: 0;
+  color: var(--f-muted);
+  font: 500 11px/1.85 var(--op-sans);
+}
+
+.op5-archive > .op4-dark-button {
+  width: 100%;
+}
+
+.op5-danger {
+  display: grid;
+  gap: 17px;
+  border-top: 4px solid var(--f-clay);
+}
+
+.op5-danger .op4-panel-head {
+  margin: 0;
+}
+
+.op5-danger-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+
+  min-height: 52px;
+  width: 100%;
+
+  background: #9d4e3f;
+  color: white;
+  border: 1px solid #9d4e3f;
+
+  font: 500 9px var(--f-mono);
+}
+
+.op5-settings-notice {
+  position: relative;
+}
+
+/* =====================================================
+   08 / RESPONSIVE LAYOUTS
+===================================================== */
+
+@media (max-width: 1460px) {
+  .op5-workspace-grid,
+  .op5-settings-grid {
+    grid-template-columns:
+      minmax(0, 1.1fr)
+      minmax(290px, .9fr);
+  }
+
+  .op5-booking-item {
+    grid-template-columns:
+      22px minmax(0, 1fr) 16px;
+  }
+
+  .op5-booking-meta {
+    grid-column: 2;
+    justify-items: start;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .op5-booking-item > svg:last-child {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
+
+@media (max-width: 1100px) {
+  .op5-workspace-grid,
+  .op5-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .op5-res-inspector,
+  .op5-guest-inspector {
+    max-width: none;
+  }
+
+  .op5-res-hero,
+  .op5-guest-hero,
+  .op5-settings-hero {
+    min-height: 315px;
+  }
+
+  .op5-overview-grid {
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .op5-res-hero,
+  .op5-guest-hero,
+  .op5-settings-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .op5-res-hero-copy,
+  .op5-guest-hero > div:first-child,
+  .op5-settings-hero > div:first-child {
+    padding: 36px 6%;
+  }
+
+  .op5-res-hero h1,
+  .op5-guest-hero h1,
+  .op5-settings-hero h1 {
+    font-size: clamp(
+      54px,
+      12vw,
+      77px
+    );
+  }
+
+  .op5-res-hero-art,
+  .op5-guest-hero-art,
+  .op5-settings-hero-graphic {
+    min-height: 200px;
+  }
+
+  .op5-guest-hero-art > span {
+    font-size: 120px;
+  }
+
+  .op5-overview-grid > div {
+    padding: 17px;
+  }
+
+  .op5-overview-grid strong {
+    font-size: 48px;
+  }
+
+  .op5-overview-grid strong.op5-stat-date {
+    font-size: 18px;
+  }
+
+  .op5-filter-strip button {
+    min-width: 98px;
+    flex-shrink: 0;
+  }
+
+  .op5-search-row {
+    flex-wrap: wrap;
+  }
+
+  .op5-search {
+    flex-basis: 100%;
+  }
+
+  .op5-mini-select {
+    flex: 1;
+  }
+
+  .op5-booking-item {
+    padding-block: 15px;
+    gap: 9px;
+  }
+
+  .op5-booking-main > strong {
+    font-size: 29px;
+  }
+
+  .op5-inspector-photo {
+    height: 195px;
+  }
+
+  .op5-guest-profile-heading {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .op5-settings-form {
+    grid-template-columns: 1fr;
+  }
+
+  .op5-settings-form .op5-field-full {
+    grid-column: auto;
+  }
+
+  .op5-settings-nav > a {
+    min-width: 220px;
+  }
+}
+
+@media (max-width: 400px) {
+  .op5-overview-grid {
+    gap: 7px;
+  }
+
+  .op5-overview-grid strong {
+    font-size: 36px;
+  }
+
+  .op5-booking-meta > strong {
+    font-size: 11px;
+  }
+
+  .op5-trip-line strong {
+    font-size: 19px;
+  }
+
+  .op5-guest-avatar {
+    width: 48px;
+    height: 48px;
+    font-size: 31px;
+  }
+
+  .op5-guest-identity strong {
+    font-size: 26px;
+  }
+
+  .op5-profile-metrics .op5-compact-money {
+    font-size: 20px;
+  }
+}
+
+/* =====================================================
+   09 / ACCESSIBILITY & REDUCED MOTION
+===================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .op5-page *,
+  .op5-page *::before,
+  .op5-page *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

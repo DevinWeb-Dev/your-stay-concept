@@ -1,438 +1,512 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+
 import {
+  ArrowDownRight,
   ArrowRight,
   ArrowUpRight,
   CalendarDays,
-  Check,
   Copy,
-  Gift,
   ShieldCheck,
-  Sparkles,
-  Tag,
+  Ticket,
+  Waves,
 } from "lucide-react";
 
 import {
+  DEMO_NOTICES,
   PHOTOS,
   formatPeso,
 } from "../../data/config.js";
 
-import { localDateKey } from "../../engine/resortEngine.js";
 import { useResort } from "../../context/ResortContext.jsx";
 
-const OFFERS = [
-  {
-    id: "first-light",
-    code: "FIRSTLIGHT08",
-    eyebrow: "A GENTLE BEGINNING",
-    title: "The First Light Escape",
-    description:
-      "Imagine arriving somewhere quiet, where a gentle coastal morning is all you need.",
-    headline: "8% off",
-    type: "percent",
-    value: 8,
-    cap: 1200,
-    stayId: "sea-glass-suite",
-    nights: 2,
-    guests: 2,
-    image: PHOTOS.suite,
-    color: "sea",
-    highlights: [
-      "Two-night coastal suite concept",
-      "For two guests",
-      "Sample discount applied to accommodation only",
-    ],
-  },
-  {
-    id: "lagoon",
-    code: "LAGOON12",
-    eyebrow: "STAY A LITTLE LONGER",
-    title: "The Lagoon Long Stay",
-    description:
-      "Three unhurried nights in a private villa, with more time for the moments that matter.",
-    headline: "12% off",
-    type: "percent",
-    value: 12,
-    cap: 2500,
-    stayId: "lagoon-villa",
-    nights: 3,
-    guests: 4,
-    image: PHOTOS.pool,
-    color: "lagoon",
-    highlights: [
-      "Three-night private villa concept",
-      "For four guests",
-      "Illustrative discount with a cap",
-    ],
-  },
-  {
-    id: "garden",
-    code: "GARDEN500",
-    eyebrow: "MOMENTS TOGETHER",
-    title: "The Garden Gathering",
-    description:
-      "Give yourself and your favorite people a reason to escape the ordinary.",
-    headline: "₱500 off",
-    type: "fixed",
-    value: 500,
-    cap: 500,
-    stayId: "palm-garden-villa",
-    nights: 2,
-    guests: 4,
-    image: PHOTOS.villas,
-    color: "clay",
-    highlights: [
-      "Two-night garden villa concept",
-      "For four guests",
-      "Sample fixed-value saving",
-    ],
-  },
-];
+import {
+  JOURNEY_OFFERS,
+  dateAfter,
+  addDays,
+  bookingHref,
+  offerPreview,
+} from "../../data/stayJourneys.js";
 
-function dateAfter(days) {
-  const date = new Date();
-  date.setHours(12, 0, 0, 0);
-  date.setDate(date.getDate() + days);
-  return localDateKey(date);
-}
+import {
+  CoastalContours,
+  Reveal,
+  TideCompass,
+} from "../../components/StayMotion.jsx";
 
-function addDays(dateKey, count) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const date = new Date(year, month - 1, day, 12);
-  date.setDate(date.getDate() + count);
-  return localDateKey(date);
-}
+import "../../styles/stay-booking-architectural.css";
 
 export default function OffersPage() {
   const navigate = useNavigate();
-  const { accommodations, getQuote } = useResort();
 
-  const [activeId, setActiveId] = useState(OFFERS[0].id);
-  const [checkIn, setCheckIn] = useState(dateAfter(4));
-  const [copyStatus, setCopyStatus] = useState("");
+  const {
+    accommodations,
+    getQuote,
+  } = useResort();
 
-  const selected =
-    OFFERS.find((item) => item.id === activeId) || OFFERS[0];
-
-  const accommodation = accommodations.find(
-    (item) => item.id === selected.stayId
+  const [activeId, setActiveId] = useState(
+    JOURNEY_OFFERS[0].id
   );
 
-  const checkOut = checkIn
-    ? addDays(checkIn, selected.nights)
-    : "";
+  const [arrival, setArrival] = useState(
+    () => dateAfter(4)
+  );
 
-  const quote = accommodation
+  const [copied, setCopied] = useState("");
+
+  const active =
+    JOURNEY_OFFERS.find(
+      (o) => o.id === activeId
+    ) || JOURNEY_OFFERS[0];
+
+  const residence = accommodations.find(
+    (s) => s.id === active.stayId
+  );
+
+  const departure = addDays(
+    arrival,
+    active.nights
+  );
+
+  const quote = residence
     ? getQuote({
-        accommodationId: accommodation.id,
-        checkIn,
-        checkOut,
-        guests: selected.guests,
+        accommodationId: residence.id,
+        checkIn: arrival,
+        checkOut: departure,
+        guests: active.guests,
         addOnIds: [],
       })
     : {
         ok: false,
-        error: "Accommodation not found.",
+        error: "Residence not found.",
       };
 
-  const demoDiscount = quote.ok
-    ? selected.type === "percent"
-      ? Math.min(
-          quote.nightlySubtotal * (selected.value / 100),
-          selected.cap
-        )
-      : Math.min(selected.value, quote.nightlySubtotal)
-    : 0;
+  const demoPreview = offerPreview(
+    active,
+    quote
+  );
 
-  const previewTotal = quote.ok
-    ? Math.max(0, quote.total - demoDiscount)
-    : 0;
+  useEffect(() => {
+    document.title = "Special Editions | YOUR STAY.";
 
-  function chooseOffer(id) {
+    return () => {
+      document.title = "YOUR STAY.";
+    };
+  }, []);
+
+  function select(id) {
     setActiveId(id);
-    setCopyStatus("");
+    setCopied("");
 
-    document.getElementById("ys4-offer-preview")
+    document
+      .getElementById("ar3-offer-study")
       ?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
+        behavior: window.matchMedia(
+          "(prefers-reduced-motion: reduce)"
+        ).matches
+          ? "auto"
+          : "smooth",
+        block: "start",
       });
   }
 
   async function copyCode() {
     try {
-      await navigator.clipboard.writeText(selected.code);
-      setCopyStatus(`Copied sample code: ${selected.code}`);
+      await navigator.clipboard.writeText(
+        active.code
+      );
+
+      setCopied("SAMPLE CODE COPIED");
     } catch {
-      setCopyStatus(
-        `Copy this sample code manually: ${selected.code}`
+      setCopied(
+        `COPY MANUALLY: ${active.code}`
       );
     }
   }
 
-  function exploreBooking() {
-    if (!quote.ok || !accommodation) return;
+  function go() {
+    if (!quote.ok || !residence) return;
 
-    const params = new URLSearchParams({
-      stay: accommodation.id,
-      checkIn,
-      checkOut,
-      guests: String(selected.guests),
-    });
-
-    navigate(`/booking?${params.toString()}`);
+    navigate(
+      bookingHref({
+        stayId: residence.id,
+        checkIn: arrival,
+        checkOut: departure,
+        guests: active.guests,
+        addOnIds: [],
+        offerId: active.id,
+      })
+    );
   }
 
   return (
-    <div className="ys4-page">
-      <section className="ys4-hero ys4-hero--offers">
-        <img
-          src={PHOTOS.escape}
-          alt="Illustrative coastal resort escape"
-        />
-        <div className="ys4-hero__shade" />
+    <div className="ar3 ar3-offers">
+      {/* TYPOGRAPHIC COVER */}
 
-        <div className="ys4-container ys4-hero__content">
-          <span className="ys4-eyebrow ys4-eyebrow--light">
-            YOUR STAY / SPECIAL MOMENTS
+      <section className="ar3-offer-cover">
+        <div className="ar3-offer-cover__typography">
+          <span className="ar3-overline">
+            YOUR STAY. / THE SPECIAL EDITION / 05
+          </span>
+
+          <span
+            className="ar3-offer-cover__outline"
+            aria-hidden="true"
+          >
+            GOOD DAYS
           </span>
 
           <h1>
-            Beautiful days.<br />
-            <em>Better reasons to stay.</em>
+            A little extra <em>time.</em>
           </h1>
 
           <p>
-            Explore promotional ideas designed around slow
-            mornings, longer escapes and meaningful experiences.
+            An editorial exploration of what a
+            considered resort promotion could feel like.
+            Beautifully imagined, transparently priced.
           </p>
 
-          <a className="ys4-button ys4-button--light" href="#ys4-offers">
-            Explore the offers <ArrowRight size={18} />
+          <a
+            href="#ar3-offer-index"
+            className="ar3-underlined"
+          >
+            EXPLORE THE OFFERS
+            <ArrowDownRight size={18} />
           </a>
+
+          <div className="ar3-offer-cover__coordinates">
+            NOT REAL PROMOTIONS / NO CODES REDEEMED /
+            CONCEPT 2026
+          </div>
+        </div>
+
+        <div className="ar3-offer-cover__visual">
+          <img
+            src={PHOTOS.escape}
+            alt="Illustrative tropical resort exterior"
+          />
+
+          <CoastalContours pale />
+
+          <span>THE PRIVATE EDITION</span>
+
+          <div
+            className="ar3-offer-cover__rosette"
+            aria-hidden="true"
+          >
+            ✳
+            <small>THE UNHURRIED ATLAS</small>
+          </div>
         </div>
       </section>
 
-      <section className="ys4-container ys4-section" id="ys4-offers">
-        <div className="ys4-section-heading">
+      {/* COLLECTIBLE OFFER FOLIOS */}
+
+      <section
+        className="ar3-offer-index ar3-container"
+        id="ar3-offer-index"
+      >
+        <Reveal className="ar3-offer-index__heading">
           <div>
-            <span className="ys4-eyebrow">
-              THE OFFERS COLLECTION
+            <span className="ar3-overline">
+              01 / THREE GOOD REASONS TO LINGER
             </span>
 
-            <h2 className="ys4-title">
-              An invitation <em>to escape.</em>
+            <h2>
+              Every invitation <em>tells a story.</em>
             </h2>
           </div>
 
           <p>
-            Designed to demonstrate how promotional offers
-            could appear on a premium resort booking website.
+            Promotional visuals below are
+            hypothetical samples. The local reservation
+            system always saves the standard quote,
+            not the discount preview.
           </p>
-        </div>
+        </Reveal>
 
-        <div className="ys4-offers-grid">
-          {OFFERS.map((offer) => (
-            <article className="ys4-offer-card" key={offer.id}>
-              <div className="ys4-offer-card__media">
+        <div className="ar3-offer-folios">
+          {JOURNEY_OFFERS.map((item, i) => (
+            <Reveal
+              as="article"
+              key={item.id}
+              className={`ar3-offer-folio ar3-offer-folio--${i}`}
+              delay={i * 90}
+            >
+              <div className="ar3-offer-folio__number">
+                <b>0{i + 1}</b>
+
+                <span>
+                  THE OFFER NOTEBOOK
+                </span>
+              </div>
+
+              <div className="ar3-offer-folio__photo">
                 <img
-                  src={offer.image}
-                  alt={`Illustrative resort setting for ${offer.title}`}
+                  src={item.image}
+                  alt={`Illustrative ${item.title} resort getaway`}
                   loading="lazy"
                 />
 
-                <div className="ys4-offer-card__tag">
-                  <Tag size={15} />
-                  CONCEPT OFFER
-                </div>
+                <span>
+                  CONCEPT / NOT REDEEMABLE
+                </span>
               </div>
 
-              <div className="ys4-offer-card__body">
-                <span className="ys4-eyebrow">{offer.eyebrow}</span>
+              <div className="ar3-offer-folio__copy">
+                <span className="ar3-overline">
+                  {item.kicker}
+                </span>
 
-                <strong className="ys4-offer-headline">
-                  {offer.headline}
-                </strong>
+                <h3>{item.title}</h3>
 
-                <h3>{offer.title}</h3>
-                <p>{offer.description}</p>
+                <p>{item.note}</p>
 
-                <div className="ys4-card-divider" />
+                <div className="ar3-offer-folio__facts">
+                  <span>
+                    {item.nights} NIGHTS /{" "}
+                    {item.guests} GUESTS
+                  </span>
 
-                <div className="ys4-offer-highlights">
-                  {offer.highlights.map((item) => (
-                    <span key={item}>
-                      <Check size={15} />
-                      {item}
-                    </span>
-                  ))}
+                  <span>
+                    {item.badge}
+                  </span>
                 </div>
 
                 <button
-                  className="ys4-button ys4-button--outline"
                   type="button"
-                  onClick={() => chooseOffer(offer.id)}
+                  onClick={() =>
+                    select(item.id)
+                  }
                 >
-                  Preview this offer
-                  <ArrowUpRight size={17} />
+                  VIEW PRICING STUDY
+                  <ArrowUpRight size={18} />
                 </button>
               </div>
-            </article>
+            </Reveal>
           ))}
         </div>
-
-        <p className="ys4-fineprint">
-          These offers are fictional examples. No discount code
-          is currently valid for a real transaction or booking.
-        </p>
       </section>
 
+      {/* TRANSPARENT PRICE CALCULATOR */}
+
       <section
-        className="ys4-offer-preview"
-        id="ys4-offer-preview"
+        className="ar3-offer-study"
+        id="ar3-offer-study"
       >
-        <div className="ys4-container ys4-offer-preview__grid">
-          <div className="ys4-offer-preview__visual">
+        <div className="ar3-container ar3-offer-study__grid">
+          <div
+            className="ar3-offer-study__photo"
+            key={active.id}
+          >
             <img
-              src={selected.image}
-              alt={`Illustrative ${selected.title}`}
+              src={active.image}
+              alt={`Illustrative ${active.title} concept villa`}
             />
 
-            <div>
-              <span className="ys4-eyebrow ys4-eyebrow--light">
-                THE EXPERIENCE
-              </span>
-
-              <h2>{selected.title}</h2>
-              <p>{selected.description}</p>
-            </div>
-          </div>
-
-          <div className="ys4-offer-preview__panel">
-            <span className="ys4-eyebrow">
-              INTERACTIVE OFFER PREVIEW
+            <span>
+              PHOTOGRAPHIC REFERENCE / VOL 05
             </span>
 
-            <h2 className="ys4-subtitle">
-              See what your stay <em>could look like.</em>
+            <TideCompass />
+          </div>
+
+          <div className="ar3-offer-study__body">
+            <span className="ar3-overline">
+              02 / THE TRANSPARENT PRICING STUDIO
+            </span>
+
+            <h2>
+              Imagine the <em>possibility.</em>
             </h2>
 
-            <p>
-              Explore a hypothetical promotional calculation.
-              The actual demo booking continues at the normal
-              engine-calculated rate.
+            <p className="ar3-offer-study__intro">
+              Explore a sample rate illustration.
+              Every calculation is explicitly separated
+              from the standard reservation quote.
             </p>
 
-            <label className="ys4-field">
-              <span>CHECK-IN DATE</span>
+            <div className="ar3-offer-study__active">
+              <div>
+                <span>
+                  SELECTED EDITION / {active.code}
+                </span>
+
+                <h3>{active.title}</h3>
+
+                <small>
+                  {residence?.name}
+                  {" / "}
+                  {active.nights} NIGHTS
+                </small>
+              </div>
+
+              <Ticket size={27} />
+            </div>
+
+            <label className="ar3-offer-study__date">
+              <span>
+                <CalendarDays size={15} />
+                CHANGE SAMPLE CHECK-IN
+              </span>
 
               <input
                 type="date"
                 min={dateAfter(0)}
-                value={checkIn}
-                onChange={(event) =>
-                  setCheckIn(event.target.value)
+                value={arrival}
+                onChange={(e) =>
+                  setArrival(e.target.value)
                 }
               />
             </label>
 
-            <div className="ys4-preview-meta">
-              <div>
-                <CalendarDays size={18} />
-                <span>{selected.nights} nights</span>
-              </div>
+            {/* PROMOTION SPECIMEN */}
 
+            <div className="ar3-offer-study__voucher">
               <div>
-                <Gift size={18} />
-                <span>{selected.headline} sample offer</span>
-              </div>
-            </div>
+                <span>
+                  SAMPLE PROMOTION CODE
+                </span>
 
-            <div className="ys4-promo-code">
-              <div>
-                <small>SAMPLE PROMO CODE</small>
-                <strong>{selected.code}</strong>
+                <strong>
+                  {active.code}
+                </strong>
+
+                <small>
+                  DISPLAY-ONLY / NO REDEMPTION
+                </small>
               </div>
 
               <button
                 type="button"
+                aria-label="Copy example promo code"
                 onClick={copyCode}
-                aria-label="Copy sample promo code"
               >
-                <Copy size={18} />
+                <Copy size={20} />
               </button>
             </div>
 
-            {copyStatus && (
-              <p className="ys4-copy-status" role="status">
-                {copyStatus}
+            {copied && (
+              <p
+                role="status"
+                className="ar3-offer-study__copied"
+              >
+                {copied}
               </p>
             )}
 
             {quote.ok ? (
-              <div className="ys4-summary">
-                <div>
-                  <span>Standard demo total</span>
-                  <strong>{formatPeso(quote.total)}</strong>
+              <>
+                <div className="ar3-offer-study__math">
+                  <div>
+                    <span>
+                      STANDARD RESORT ENGINE TOTAL
+                    </span>
+
+                    <strong>
+                      {formatPeso(quote.total)}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>
+                      HYPOTHETICAL SAVING
+                    </span>
+
+                    <strong>
+                      −{formatPeso(
+                        demoPreview.saving
+                      )}
+                    </strong>
+                  </div>
+
+                  <div className="ar3-offer-study__illustration">
+                    <span>
+                      ILLUSTRATIVE PROMO ESTIMATE
+                    </span>
+
+                    <strong>
+                      {formatPeso(
+                        demoPreview.hypotheticalTotal
+                      )}
+                    </strong>
+                  </div>
                 </div>
 
-                <div>
-                  <span>Hypothetical saving</span>
-                  <strong>-{formatPeso(demoDiscount)}</strong>
-                </div>
+                <p className="ar3-offer-study__warning">
+                  <ShieldCheck size={19} />
 
-                <div className="ys4-summary__total">
-                  <span>Illustrative offer total</span>
-                  <strong>{formatPeso(previewTotal)}</strong>
-                </div>
-              </div>
+                  <span>
+                    <b>Important:</b> The saved booking
+                    will still use{" "}
+                    <b>{formatPeso(quote.total)}</b>.
+                    This preview is not a live deal
+                    or discount.
+                  </span>
+                </p>
+              </>
             ) : (
-              <p className="ys4-error" role="status">
+              <p
+                className="ar3-error"
+                role="status"
+              >
                 {quote.error}
               </p>
             )}
 
             <button
               type="button"
-              className="ys4-button ys4-button--full"
               disabled={!quote.ok}
-              onClick={exploreBooking}
+              className="ar3-main-action"
+              onClick={go}
             >
-              Explore standard booking <ArrowRight size={18} />
+              CONTINUE AT STANDARD DEMO RATE
+              <ArrowUpRight size={19} />
             </button>
 
-            <div className="ys4-demo-notice">
-              <ShieldCheck size={17} />
-              Offer preview only. The booking page does not apply
-              this discount, and no actual payment is processed.
-            </div>
+            <p className="ar3-disclosure">
+              {DEMO_NOTICES.booking}
+              {" "}
+              {DEMO_NOTICES.payment}
+            </p>
           </div>
         </div>
       </section>
 
-      <section className="ys4-container ys4-section ys4-ending">
-        <Sparkles size={29} strokeWidth={1.3} />
+      {/* FINAL EDITORIAL FRAME */}
 
-        <h2 className="ys4-title">
-          Some moments are <em>priceless.</em>
-        </h2>
+      <section className="ar3-offers-finale ar3-container">
+        <Reveal>
+          <span className="ar3-overline">
+            AN INVITATION WITHOUT CONDITIONS
+          </span>
 
-        <p>
-          Browse the complete accommodation collection or
-          discover curated ways to spend your stay.
-        </p>
+          <h2>
+            The stay itself is <em>the occasion.</em>
+          </h2>
 
-        <div className="ys4-actions">
-          <Link to="/stays" className="ys4-button">
-            Explore stays <ArrowUpRight size={17} />
-          </Link>
+          <p>
+            Move beyond the offer study and explore
+            thoughtful villas and curated experiences.
+          </p>
 
-          <Link
-            to="/packages"
-            className="ys4-button ys4-button--outline"
-          >
-            View packages <ArrowRight size={17} />
-          </Link>
+          <div>
+            <Link to="/stays">
+              THE RESIDENCE COLLECTION
+              <ArrowUpRight size={18} />
+            </Link>
+
+            <Link to="/packages">
+              CURATED ESCAPES
+              <ArrowRight size={18} />
+            </Link>
+          </div>
+        </Reveal>
+
+        <div className="ar3-offers-finale__motif">
+          <CoastalContours />
+          <Waves size={43} />
+          <span>THE UNHURRIED ATLAS</span>
         </div>
       </section>
     </div>

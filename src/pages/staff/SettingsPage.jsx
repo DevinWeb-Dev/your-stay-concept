@@ -1,22 +1,31 @@
 import { useState } from "react";
 import {
+  ArrowRight,
+  ArrowUpRight,
   CheckCircle2,
+  Database,
   Download,
+  FileJson,
+  LockKeyhole,
   RotateCcw,
   Save,
   Settings2,
   ShieldAlert,
   ShieldCheck,
   Trash2,
+  Waves,
 } from "lucide-react";
 
 import { BRAND } from "../../data/config.js";
 import { useResort } from "../../context/ResortContext.jsx";
 
-const DRAFT_KEY = "your-stay-profile-draft-v1";
-const HOUSEKEEPING_KEY = "your-stay-housekeeping-demo-v1";
+import "../../styles/stay-staff-finish.css";
 
-const EMPTY_PROFILE = {
+const PROFILE_KEY = "your-stay-profile-draft-v1";
+const HOUSEKEEPING_KEY =
+  "your-stay-housekeeping-demo-v1";
+
+const defaultProfile = {
   businessName: BRAND.name,
   email: "",
   phone: "",
@@ -26,35 +35,62 @@ const EMPTY_PROFILE = {
 
 function loadProfile() {
   try {
-    const saved = JSON.parse(
-      localStorage.getItem(DRAFT_KEY) || "null"
+    const value = JSON.parse(
+      localStorage.getItem(PROFILE_KEY) || "null"
     );
 
-    return saved && typeof saved === "object"
-      ? { ...EMPTY_PROFILE, ...saved }
-      : { ...EMPTY_PROFILE };
+    return value &&
+      typeof value === "object" &&
+      !Array.isArray(value)
+      ? {
+          ...defaultProfile,
+          ...Object.fromEntries(
+            Object.entries(value).filter(
+              ([key]) => key in defaultProfile
+            )
+          ),
+        }
+      : { ...defaultProfile };
   } catch {
-    return { ...EMPTY_PROFILE };
+    return { ...defaultProfile };
   }
 }
 
-function downloadJson(name, data) {
-  const json = JSON.stringify(data, null, 2);
+function getHousekeeping() {
+  try {
+    const data = JSON.parse(
+      localStorage.getItem(HOUSEKEEPING_KEY) ||
+        "[]"
+    );
 
-  const blob = new Blob([json], {
-    type: "application/json;charset=utf-8",
-  });
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+function downloadJson(filename, value) {
+  const blob = new Blob(
+    [JSON.stringify(value, null, 2)],
+    {
+      type: "application/json;charset=utf-8",
+    }
+  );
 
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
 
   link.href = url;
-  link.download = name;
+  link.download = filename;
+
   document.body.appendChild(link);
   link.click();
   link.remove();
 
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  window.setTimeout(
+    () => URL.revokeObjectURL(url),
+    1000
+  );
 }
 
 export default function SettingsPage() {
@@ -70,383 +106,749 @@ export default function SettingsPage() {
     actions,
   } = useResort();
 
-  const [draft, setDraft] = useState(loadProfile);
-  const [feedback, setFeedback] = useState("");
-  const [resetText, setResetText] = useState("");
+  const [saved, setSaved] =
+    useState(loadProfile);
 
-  const [resetHousekeeping, setResetHousekeeping] =
-    useState(true);
+  const [draft, setDraft] =
+    useState(loadProfile);
 
-  const hasUnsavedChanges =
+  const [includeContacts, setIncludeContacts] =
+    useState(false);
+
+  const [
+    includeHousekeeping,
+    setIncludeHousekeeping,
+  ] = useState(true);
+
+  const [resetText, setResetText] =
+    useState("");
+
+  const [
+    resetHousekeeping,
+    setResetHousekeeping,
+  ] = useState(true);
+
+  const [notice, setNotice] =
+    useState("");
+
+  const dirty =
     JSON.stringify(draft) !==
-    JSON.stringify(loadProfile());
+    JSON.stringify(saved);
 
-  function update(field, value) {
+  function update(key, value) {
     setDraft((old) => ({
       ...old,
-      [field]: value,
+      [key]: value,
     }));
-    setFeedback("");
+
+    setNotice("");
   }
 
-  function saveDraft(event) {
+  function save(event) {
     event.preventDefault();
 
     try {
       localStorage.setItem(
-        DRAFT_KEY,
+        PROFILE_KEY,
         JSON.stringify(draft)
       );
 
-      setFeedback(
-        "Profile draft saved in this browser only."
+      setSaved({ ...draft });
+
+      setNotice(
+        "Profile draft saved in this browser. Public branding and booking rules are unchanged."
       );
     } catch {
-      setFeedback(
-        "Unable to save the draft. Browser storage may be disabled."
+      setNotice(
+        "Browser storage is unavailable. Draft could not be saved."
       );
     }
+  }
+
+  function undo() {
+    setDraft({ ...saved });
+
+    setNotice(
+      "Unsaved draft changes discarded."
+    );
   }
 
   function exportBackup() {
-    let housekeeping = [];
-
-    try {
-      const parsed = JSON.parse(
-        localStorage.getItem(HOUSEKEEPING_KEY) || "[]"
-      );
-
-      if (Array.isArray(parsed)) housekeeping = parsed;
-    } catch {
-      // Ignore invalid optional data.
-    }
-
-    downloadJson("your-stay-demo-backup.json", {
-      generatedAt: new Date().toISOString(),
-      type: "YOUR STAY local demo backup",
-      resortState: state,
-      profileDraft: draft,
-      housekeepingTasks: housekeeping,
-    });
-
-    setFeedback("Demo backup downloaded.");
-  }
-
-  function resetOperations() {
-    if (resetText !== "RESET") {
-      setFeedback("Type RESET to enable this action.");
-      return;
-    }
+    const sensitive = includeContacts;
 
     if (
+      sensitive &&
       !window.confirm(
-        "Permanently reset demo reservations, maintenance blocks, favorites and activity in this browser?"
+        "This JSON will include the entered guest names and emails. Export only fictional demo data and store the file privately. Continue?"
       )
     ) {
       return;
     }
 
-    const result = actions.resetDemo();
+    const resortState = {
+      ...state,
 
-    if (!result.ok) {
-      setFeedback(result.error);
+      reservations: (
+        state.reservations || []
+      ).map((booking) =>
+        sensitive
+          ? booking
+          : {
+              ...booking,
+              guestName: "[REDACTED]",
+              email: "[REDACTED]",
+            }
+      ),
+    };
+
+    const housekeeping =
+      includeHousekeeping
+        ? getHousekeeping()
+        : [];
+
+    const tasks = sensitive
+      ? housekeeping
+      : housekeeping.map((task) => ({
+          ...task,
+          description: "[REDACTED]",
+        }));
+
+    try {
+      downloadJson(
+        "your-stay-demo-archive.json",
+        {
+          type:
+            "YOUR STAY / LOCAL CONCEPT ARCHIVE",
+
+          generatedAt:
+            new Date().toISOString(),
+
+          isDemo: true,
+
+          containsOriginalGuestContacts:
+            sensitive,
+
+          restorableThroughWebsite: false,
+
+          note:
+            "Archive only: this portfolio prototype does not provide a restore/import workflow.",
+
+          resortState,
+
+          profileDraft: sensitive
+            ? draft
+            : {
+                ...draft,
+                email: "[REDACTED]",
+                phone: "[REDACTED]",
+                address: "[REDACTED]",
+              },
+
+          housekeepingTasks: tasks,
+        }
+      );
+
+      setNotice(
+        "Local demo JSON archive exported. No data was uploaded anywhere."
+      );
+    } catch {
+      setNotice(
+        "Could not prepare the JSON archive."
+      );
+    }
+  }
+
+  function resetOperations() {
+    if (resetText !== "RESET") {
+      setNotice(
+        "Type RESET exactly to enable the action."
+      );
+      return;
+    }
+
+    if (
+      !window.confirm(
+        "Reset all local demo reservations, maintenance blocks, favorites and activity? This cannot be undone. Export an archive first if needed."
+      )
+    ) {
+      return;
+    }
+
+    const response = actions.resetDemo();
+
+    if (!response.ok) {
+      setNotice(
+        response.error ||
+          "Unable to reset demo."
+      );
       return;
     }
 
     if (resetHousekeeping) {
       try {
-        localStorage.removeItem(HOUSEKEEPING_KEY);
+        localStorage.removeItem(
+          HOUSEKEEPING_KEY
+        );
       } catch {
-        // Browser storage may be unavailable.
+        setNotice(
+          "Resort records reset, but housekeeping storage could not be cleared."
+        );
+
+        setResetText("");
+        return;
       }
     }
 
     setResetText("");
-    setFeedback(
-      "Operational demo data reset. Profile draft was retained."
+
+    setNotice(
+      `Local resort records reset.${
+        resetHousekeeping
+          ? " Housekeeping tasks cleared for the next visit to the Housekeeping page."
+          : " Housekeeping tasks retained."
+      } Profile draft retained.`
     );
   }
 
+  const policiesRows = [
+    ["Arrival", policies.checkInTime],
+    ["Departure", policies.checkOutTime],
+    ["Minimum nights", policies.minimumNights],
+    ["Maximum nights", policies.maximumNights],
+    [
+      "Booking window",
+      `${policies.maximumAdvanceDays} days`,
+    ],
+    [
+      "Online payments",
+      policies.paymentProcessingEnabled
+        ? "Enabled"
+        : "NOT CONNECTED",
+    ],
+    [
+      "Verified resort location",
+      policies.locationVerified
+        ? "Verified"
+        : "NOT VERIFIED",
+    ],
+  ];
+
+  const statRows = [
+    ["Residences", accommodations.length],
+    ["Reservation records", reservations.length],
+    [
+      "Maintenance windows",
+      maintenanceBlocks.length,
+    ],
+    ["Saved villas", favorites.length],
+    ["Activity events", activity.length],
+    [
+      "Housekeeping tasks",
+      getHousekeeping().length,
+    ],
+  ];
+
   return (
-    <div className="ys5-page ys6-page">
-      <header className="ys5-page-heading">
+    <div className="op4-page op5-page op5-settings-page">
+      {/* ARCHITECTURAL SETTINGS COVER */}
+
+      <section className="op5-settings-hero">
         <div>
-          <span className="ys5-eyebrow">
-            SYSTEM PREFERENCES / DEMO
+          <span className="op4-eyebrow">
+            OPERATIONS / CHAPTER 08 ·
+            THE CONFIGURATION VAULT
           </span>
 
           <h1>
-            Make it <em>your own.</em>
+            Designed down to{" "}
+            <em>the details.</em>
           </h1>
 
           <p>
-            Review the resort setup, prepare business profile
-            drafts and manage local demonstration records.
+            A considered home for local profile
+            drafts, transparent policies,
+            demonstration data exports and
+            careful reset controls. Nothing
+            here updates a real business or server.
           </p>
         </div>
 
-        <button
-          type="button"
-          className="ys5-button"
-          onClick={exportBackup}
+        <div
+          className="op5-settings-hero-graphic"
+          aria-hidden="true"
         >
-          <Download size={17} />
-          Export JSON backup
-        </button>
-      </header>
+          <span className="op5-graphic-rings" />
 
-      <div className="ys6-settings-grid">
-        <div className="ys6-settings-main">
-          <section className="ys5-panel">
-            <div className="ys5-panel-heading">
+          <Settings2
+            size={64}
+            strokeWidth={0.8}
+          />
+
+          <small>
+            THE SYSTEM FIELD GUIDE · 08
+          </small>
+        </div>
+      </section>
+
+      {/* SETTINGS CHAPTER NAVIGATION */}
+
+      <div className="op5-settings-nav">
+        <a href="#op5-identity">
+          01 — BRAND DRAFT
+          <ArrowRight size={13} />
+        </a>
+
+        <a href="#op5-policies">
+          02 — BOOKING POLICIES
+          <ArrowRight size={13} />
+        </a>
+
+        <a href="#op5-vault">
+          03 — THE DATA VAULT
+          <ArrowRight size={13} />
+        </a>
+      </div>
+
+      <div className="op5-settings-grid">
+        <div className="op5-settings-primary">
+          {/* BRAND PROFILE DRAFT */}
+
+          <section
+            id="op5-identity"
+            className="op4-panel op5-settings-section"
+          >
+            <div className="op4-panel-head">
               <div>
-                <span className="ys5-eyebrow">
-                  BUSINESS PROFILE
+                <span className="op4-eyebrow">
+                  01 / BRAND & HOSPITALITY IDENTITY
                 </span>
-                <h2>Resort identity</h2>
-                <p>
-                  Draft business information for a future
-                  real-client adaptation.
-                </p>
+
+                <h2>The identity atelier.</h2>
               </div>
-              <Settings2 size={22} />
+
+              <span className="op4-outline-mark">
+                DRAFT ONLY
+              </span>
             </div>
 
-            <form onSubmit={saveDraft}>
-              <label className="ys5-field">
-                <span>BUSINESS NAME</span>
+            <p className="op4-muted">
+              Prepare client-ready contact
+              information without affecting
+              the published site. Public pages
+              continue to read from{" "}
+              <code>
+                src/data/config.js
+              </code>.
+            </p>
+
+            <form
+              className="op5-settings-form"
+              onSubmit={save}
+            >
+              <label className="op4-field op5-field-full">
+                RESORT / BUSINESS NAME
+
                 <input
+                  required
+                  maxLength={90}
                   value={draft.businessName}
                   onChange={(e) =>
-                    update("businessName", e.target.value)
+                    update(
+                      "businessName",
+                      e.target.value
+                    )
                   }
-                  maxLength={90}
-                  required
                 />
               </label>
 
-              <div className="ys5-form-grid">
-                <label className="ys5-field">
-                  <span>BUSINESS EMAIL</span>
-                  <input
-                    type="email"
-                    placeholder="To be configured"
-                    value={draft.email}
-                    onChange={(e) =>
-                      update("email", e.target.value)
-                    }
-                  />
-                </label>
+              <label className="op4-field">
+                CONTACT EMAIL
 
-                <label className="ys5-field">
-                  <span>PHONE NUMBER</span>
-                  <input
-                    type="tel"
-                    placeholder="To be configured"
-                    value={draft.phone}
-                    onChange={(e) =>
-                      update("phone", e.target.value)
-                    }
-                    maxLength={30}
-                  />
-                </label>
-              </div>
-
-              <label className="ys5-field">
-                <span>BUSINESS LOCATION</span>
                 <input
-                  value={draft.address}
-                  placeholder="Not yet configured"
+                  type="email"
+                  maxLength={160}
+                  placeholder="Not configured"
+                  value={draft.email}
+                  onChange={(e) =>
+                    update(
+                      "email",
+                      e.target.value
+                    )
+                  }
+                />
+              </label>
+
+              <label className="op4-field">
+                TELEPHONE
+
+                <input
+                  type="tel"
+                  maxLength={30}
+                  placeholder="Not configured"
+                  value={draft.phone}
+                  onChange={(e) =>
+                    update(
+                      "phone",
+                      e.target.value
+                    )
+                  }
+                />
+              </label>
+
+              <label className="op4-field op5-field-full">
+                LOCATION / ADDRESS
+
+                <input
                   maxLength={180}
+                  placeholder="Not verified"
+                  value={draft.address}
                   onChange={(e) =>
-                    update("address", e.target.value)
+                    update(
+                      "address",
+                      e.target.value
+                    )
                   }
                 />
               </label>
 
-              <label className="ys5-field">
-                <span>BRAND DESCRIPTION</span>
+              <label className="op4-field op5-field-full">
+                BRAND STORY
+
                 <textarea
-                  rows={4}
-                  value={draft.description}
                   maxLength={500}
+                  rows={5}
+                  value={draft.description}
                   onChange={(e) =>
-                    update("description", e.target.value)
+                    update(
+                      "description",
+                      e.target.value
+                    )
                   }
                 />
               </label>
 
-              <div className="ys6-settings-actions">
-                <button className="ys5-button" type="submit">
-                  <Save size={17} />
-                  Save local draft
+              <div className="op5-draft-actions">
+                <button
+                  className="op4-dark-button"
+                  type="submit"
+                >
+                  <Save size={16} />
+                  SAVE LOCAL DRAFT
                 </button>
 
                 <button
+                  className="op5-secondary-action"
                   type="button"
-                  className="ys5-button ys5-button-outline"
-                  disabled={!hasUnsavedChanges}
-                  onClick={() => setDraft(loadProfile())}
+                  disabled={!dirty}
+                  onClick={undo}
                 >
-                  <RotateCcw size={17} />
-                  Discard unsaved edits
+                  <RotateCcw size={16} />
+                  DISCARD UNSAVED
                 </button>
+
+                <span
+                  className={
+                    dirty
+                      ? "is-dirty"
+                      : ""
+                  }
+                >
+                  {dirty
+                    ? "UNSAVED EDITS"
+                    : "NO UNSAVED EDITS"}
+                </span>
+              </div>
+            </form>
+
+            {/* LIVE BRAND PREVIEW */}
+
+            <div className="op5-brand-preview">
+              <div>
+                <Waves size={26} />
+
+                <span>
+                  PREVIEW / DRAFT ONLY
+                </span>
               </div>
 
-              <p className="ys5-legal-note">
-                Changes are draft-only. The public website,
-                booking catalog and reservation engine still
-                use the values in `src/data/config.js`.
+              <h3>
+                {draft.businessName ||
+                  "YOUR STAY."}
+              </h3>
+
+              <p>
+                {draft.description ||
+                  "A place to stay. A feeling to remember."}
               </p>
-            </form>
+
+              <small>
+                {[
+                  draft.email,
+                  draft.phone,
+                  draft.address,
+                ]
+                  .filter(Boolean)
+                  .join("   ·   ") ||
+                  "BUSINESS CONTACTS NOT YET CONFIGURED"}
+              </small>
+            </div>
           </section>
 
-          <section className="ys5-panel">
-            <div className="ys5-panel-heading">
+          {/* READ-ONLY ENGINE POLICIES */}
+
+          <section
+            id="op5-policies"
+            className="op4-panel op5-settings-section"
+          >
+            <div className="op4-panel-head">
               <div>
-                <span className="ys5-eyebrow">
-                  OPERATING POLICIES
+                <span className="op4-eyebrow">
+                  02 / CENTRAL BOOKING LOGIC
                 </span>
-                <h2>Reservation rules</h2>
+
+                <h2>The house rules.</h2>
               </div>
+
               <ShieldCheck size={22} />
             </div>
 
-            <div className="ys6-policy-list">
-              {[
-                ["Check-in time", policies.checkInTime],
-                ["Check-out time", policies.checkOutTime],
-                ["Minimum nights", policies.minimumNights],
-                ["Maximum nights", policies.maximumNights],
-                [
-                  "Booking window",
-                  `${policies.maximumAdvanceDays} days`,
-                ],
-                [
-                  "Real payment processing",
-                  policies.paymentProcessingEnabled
-                    ? "Enabled"
-                    : "Not connected",
-                ],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                </div>
-              ))}
+            <div className="op5-policy-list">
+              {policiesRows.map(
+                ([key, value], index) => (
+                  <div key={key}>
+                    <span>
+                      {String(
+                        index + 1
+                      ).padStart(2, "0")}
+                      {" / "}
+                      {key}
+                    </span>
+
+                    <strong>{value}</strong>
+                  </div>
+                )
+              )}
             </div>
 
-            <p className="ys5-legal-note">
-              These policies are read-only. To change booking
-              rules, update the centralized configuration
-              and retest the resort engine.
+            <p className="op5-inline-disclaimer">
+              <LockKeyhole size={17} />
+
+              READ-ONLY ENGINE VALUES.
+              Changes must be made in the
+              real source configuration and
+              validated against engine tests.
             </p>
           </section>
         </div>
 
-        <aside className="ys6-settings-side">
-          <section className="ys5-panel">
-            <span className="ys5-eyebrow">
-              SYSTEM OVERVIEW
+        {/* DEMO DATA CONTROL COLUMN */}
+
+        <aside
+          id="op5-vault"
+          className="op5-settings-aside"
+        >
+          <section className="op4-panel op5-vault">
+            <span className="op4-eyebrow">
+              03 / BROWSER-LOCAL INVENTORY
             </span>
 
-            <h2 className="ys6-subheading">
-              Local demo records
+            <h2>
+              The data <em>vault.</em>
             </h2>
 
-            <div className="ys6-policy-list">
-              {[
-                ["Accommodations", accommodations.length],
-                ["Reservations", reservations.length],
-                ["Maintenance blocks", maintenanceBlocks.length],
-                ["Favorites", favorites.length],
-                ["Activity events", activity.length],
-              ].map(([label, value]) => (
-                <div key={label}>
-                  <span>{label}</span>
-                  <strong>{value}</strong>
-                </div>
-              ))}
+            <p className="op4-muted">
+              Nothing is stored in a business
+              database or synchronized between
+              devices. These are counts of
+              demonstration records in the
+              current browser.
+            </p>
+
+            <div className="op5-policy-list">
+              {statRows.map(
+                ([label, count]) => (
+                  <div key={label}>
+                    <span>{label}</span>
+                    <strong>{count}</strong>
+                  </div>
+                )
+              )}
             </div>
 
-            <div className="ys6-system-note">
-              <CheckCircle2 size={20} />
+            <div className="op5-connection-stamp">
+              <CheckCircle2 size={19} />
+
               <span>
-                {brand.wordmark || "YOUR STAY."}
+                {brand.wordmark ||
+                  "YOUR STAY."}
+
                 <small>
-                  Frontend-only demonstration
+                  FRONTEND DEMO · NO SERVER SYNC
                 </small>
               </span>
             </div>
           </section>
 
-          <section className="ys5-panel ys6-danger-panel">
-            <div className="ys5-panel-heading">
+          {/* PRIVACY-CONSCIOUS ARCHIVE */}
+
+          <section className="op4-panel op5-archive">
+            <div className="op4-panel-head">
               <div>
-                <span className="ys5-eyebrow">
-                  DEMO DATA CONTROL
+                <span className="op4-eyebrow">
+                  04 / SAFE LOCAL EXPORT
                 </span>
-                <h2>Reset operations</h2>
+
+                <h2>Keep an archive.</h2>
               </div>
-              <ShieldAlert size={23} />
+
+              <FileJson size={23} />
             </div>
 
             <p>
-              This clears locally saved reservations,
-              maintenance blocks, favorites and
-              operational activity.
+              Download a JSON snapshot for
+              inspection. This is{" "}
+              <strong>not</strong> a website
+              restore/import system.
             </p>
 
-            <label className="ys6-reset-check">
+            <label className="op5-checkline">
               <input
                 type="checkbox"
-                checked={resetHousekeeping}
+                checked={includeContacts}
                 onChange={(e) =>
-                  setResetHousekeeping(e.target.checked)
+                  setIncludeContacts(
+                    e.target.checked
+                  )
                 }
               />
-              Also clear housekeeping task data
+
+              Include guest and business
+              contact fields
             </label>
 
-            <label className="ys5-field">
-              <span>TYPE RESET TO CONFIRM</span>
+            <label className="op5-checkline">
               <input
-                value={resetText}
+                type="checkbox"
+                checked={includeHousekeeping}
                 onChange={(e) =>
-                  setResetText(e.target.value)
+                  setIncludeHousekeeping(
+                    e.target.checked
+                  )
                 }
-                placeholder="RESET"
-                autoComplete="off"
               />
+
+              Include housekeeping tasks
             </label>
 
             <button
               type="button"
-              className="ys6-danger-button"
-              onClick={resetOperations}
-              disabled={resetText !== "RESET"}
+              className="op4-dark-button"
+              onClick={exportBackup}
             >
-              <Trash2 size={17} />
-              Reset demo records
+              <Download size={16} />
+              DOWNLOAD DEMO JSON
+              <ArrowUpRight size={16} />
             </button>
 
-            <p className="ys5-legal-note">
-              Export a backup first if needed. This resets
-              browser-local demo data, not a server database.
+            <small>
+              Contact fields are redacted
+              by default. Store archives
+              privately even when using
+              fictional data.
+            </small>
+          </section>
+
+          {/* CONFIRMED DESTRUCTIVE ACTION */}
+
+          <section className="op4-panel op5-danger">
+            <div className="op4-panel-head">
+              <div>
+                <span className="op4-eyebrow">
+                  05 / IRREVERSIBLE DATA ACTION
+                </span>
+
+                <h2>Clear the slate.</h2>
+              </div>
+
+              <ShieldAlert size={23} />
+            </div>
+
+            <p>
+              Resets the original frontend
+              engine's reservations, maintenance
+              windows, saved villas and activity
+              log. Draft branding stays intact.
+            </p>
+
+            <label className="op5-checkline">
+              <input
+                type="checkbox"
+                checked={resetHousekeeping}
+                onChange={(e) =>
+                  setResetHousekeeping(
+                    e.target.checked
+                  )
+                }
+              />
+
+              Also clear housekeeping tasks
+            </label>
+
+            <label className="op4-field">
+              TYPE RESET TO CONFIRM
+
+              <input
+                type="text"
+                autoComplete="off"
+                placeholder="RESET"
+                value={resetText}
+                onChange={(e) =>
+                  setResetText(
+                    e.target.value
+                  )
+                }
+              />
+            </label>
+
+            <button
+              className="op5-danger-action"
+              type="button"
+              disabled={
+                resetText !== "RESET"
+              }
+              onClick={resetOperations}
+            >
+              <Trash2 size={17} />
+              RESET LOCAL OPERATIONS
+            </button>
+
+            <p className="op5-inline-disclaimer">
+              <Database size={16} />
+
+              This does not delete server data:
+              no server exists in this concept.
             </p>
           </section>
         </aside>
       </div>
 
-      {feedback && (
-        <div
-          className="ys5-feedback"
+      {notice && (
+        <p
+          className="op4-feedback op5-settings-notice"
           role="status"
           aria-live="polite"
         >
-          {feedback}
-        </div>
+          {notice}
+        </p>
       )}
+
+      <p className="op5-privacy-note">
+        <ShieldCheck size={16} />
+
+        The website's permanent developer
+        credit is unchanged:{" "}
+        {brand.developerCredit}
+      </p>
     </div>
   );
 }

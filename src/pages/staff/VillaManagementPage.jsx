@@ -2,27 +2,42 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import {
+  ArrowRight,
   ArrowUpRight,
-  Ban,
-  Building2,
   CalendarDays,
   CheckCircle2,
+  MapPin,
   Search,
   ShieldCheck,
   Trash2,
   Wrench,
 } from "lucide-react";
 
-import { formatPeso } from "../../data/config.js";
+import {
+  formatPeso,
+  getZone,
+} from "../../data/config.js";
 
-import { localDateKey } from "../../engine/resortEngine.js";
-import { useResort } from "../../context/ResortContext.jsx";
+import {
+  localDateKey,
+} from "../../engine/resortEngine.js";
 
-function addDays(dateKey, days) {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  const date = new Date(year, month - 1, day, 12);
-  date.setDate(date.getDate() + days);
-  return localDateKey(date);
+import {
+  useResort,
+} from "../../context/ResortContext.jsx";
+
+function nextDay(key) {
+  const [year, month, day] =
+    key.split("-").map(Number);
+
+  return localDateKey(
+    new Date(
+      year,
+      month - 1,
+      day + 1,
+      12
+    )
+  );
 }
 
 export default function VillaManagementPage() {
@@ -34,346 +49,519 @@ export default function VillaManagementPage() {
     getAvailability,
   } = useResort();
 
-  const today = localDateKey();
-  const tomorrow = addDays(today, 1);
-
   const [selectedId, setSelectedId] = useState(
     accommodations[0]?.id || ""
   );
-  const [checkIn, setCheckIn] = useState(today);
-  const [checkOut, setCheckOut] = useState(tomorrow);
-  const [note, setNote] = useState("Maintenance / inspection");
+
   const [search, setSearch] = useState("");
+
+  const [from, setFrom] = useState(localDateKey);
+
+  const [to, setTo] = useState(
+    () => nextDay(localDateKey())
+  );
+
+  const [note, setNote] = useState(
+    "Preventive maintenance / inspection"
+  );
+
   const [feedback, setFeedback] = useState("");
 
-  const stay = accommodations.find(
-    (item) => item.id === selectedId
+  const chosen = accommodations.find(
+    (stay) => stay.id === selectedId
   );
 
-  const availability = stay
-    ? getAvailability({
-        accommodationId: stay.id,
-        checkIn,
-        checkOut,
-      })
-    : { available: false, reason: "Choose a villa." };
-
-  const visible = accommodations.filter((item) =>
-    `${item.name} ${item.category} ${item.zoneId}`
-      .toLowerCase()
-      .includes(search.toLowerCase())
-  );
-
-  const maintenanceForSelected = maintenanceBlocks.filter(
-    (block) => block.accommodationId === selectedId
-  );
-
-  const totalConfirmed = reservations.filter(
+  const active = reservations.filter(
     (booking) =>
-      booking.accommodationId === selectedId &&
-      ["confirmed", "checked_in"].includes(booking.status)
-  ).length;
+      ["confirmed", "checked_in"].includes(
+        booking.status
+      )
+  );
 
-  function updateStart(value) {
-    setCheckIn(value);
+  const relatedBlocks = maintenanceBlocks
+    .filter(
+      (block) =>
+        block.accommodationId === selectedId
+    )
+    .sort((a, b) =>
+      a.checkIn.localeCompare(b.checkIn)
+    );
 
-    if (value && checkOut <= value) {
-      setCheckOut(addDays(value, 1));
-    }
+  const availability = chosen
+    ? getAvailability({
+        accommodationId: chosen.id,
+        checkIn: from,
+        checkOut: to,
+      })
+    : null;
+
+  const visible = accommodations.filter(
+    (stay) =>
+      `${
+        stay.name
+      } ${
+        stay.category
+      } ${
+        getZone(stay.zoneId)?.label
+      }`
+        .toLowerCase()
+        .includes(search.toLowerCase())
+  );
+
+  function choose(id) {
+    setSelectedId(id);
+    setFeedback("");
   }
 
   function createBlock(event) {
     event.preventDefault();
-    setFeedback("");
 
     const result = actions.addMaintenanceBlock({
       accommodationId: selectedId,
-      checkIn,
-      checkOut,
+      checkIn: from,
+      checkOut: to,
       note: note.trim(),
     });
 
     setFeedback(
       result.ok
-        ? "Maintenance date block saved in local demo data."
-        : result.error || "Unable to block these dates."
+        ? "Date block added to the local reservation engine."
+        : result.error ||
+          "Unable to block these dates."
     );
   }
 
-  function deleteBlock(block) {
+  function removeBlock(id) {
     if (
       !window.confirm(
-        `Remove maintenance block for ${block.checkIn} to ${block.checkOut}?`
+        "Remove this maintenance block from the local demo?"
       )
     ) {
       return;
     }
 
-    const result = actions.removeMaintenanceBlock(block.id);
+    const result =
+      actions.removeMaintenanceBlock(id);
 
     setFeedback(
       result.ok
-        ? "Maintenance block removed."
-        : result.error || "Unable to remove block."
+        ? "Maintenance block removed from local demo."
+        : result.error ||
+          "Unable to remove block."
     );
   }
 
+  const today = localDateKey();
+
   return (
-    <div className="ys5-page">
-      <div className="ys5-page-heading">
+    <div className="op4-page">
+      <div className="op4-page-title">
         <div>
-          <span className="ys5-eyebrow">
-            ACCOMMODATION OPERATIONS
+          <span className="op4-eyebrow">
+            OPERATIONS / CHAPTER 04 · RESIDENCE MANAGEMENT
           </span>
+
           <h1>
-            Every villa, <em>perfectly considered.</em>
+            Four places.{" "}
+            <em>Endless attention.</em>
           </h1>
+
           <p>
-            Review accommodation details and manage
-            blocked dates within this resort prototype.
+            Curate your residence directory
+            and manage real demo-engine maintenance
+            blocks without changing accommodation
+            rates or public content.
           </p>
         </div>
 
-        <Link className="ys5-button" to="/stays">
-          View public villas <ArrowUpRight size={17} />
+        <Link
+          className="op4-dark-button"
+          to="/stays"
+        >
+          VIEW PUBLIC COLLECTION
+          <ArrowUpRight size={17} />
         </Link>
       </div>
 
-      <div className="ys5-villa-layout">
-        <section className="ys5-panel">
-          <div className="ys5-panel-heading">
+      <div className="op4-villa-grid">
+        {/* ARCHITECTURAL PROPERTY INDEX */}
+
+        <section className="op4-panel op4-villa-directory">
+          <div className="op4-panel-head">
             <div>
-              <span className="ys5-eyebrow">THE COLLECTION</span>
-              <h2>Villa directory</h2>
+              <span className="op4-eyebrow">
+                01 / THE ARCHITECTURAL INVENTORY
+              </span>
+
+              <h2>The collection.</h2>
             </div>
-            <Building2 size={22} />
+
+            <span className="op4-outline-mark">
+              04 RESIDENCES
+            </span>
           </div>
 
-          <div className="ys5-search">
-            <Search size={17} />
+          <label className="op4-search">
+            <Search size={18} />
+
             <input
-              type="search"
-              placeholder="Search accommodations..."
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              aria-label="Search accommodations"
+              onChange={(event) =>
+                setSearch(event.target.value)
+              }
+              placeholder="Search a residence or landscape"
+              aria-label="Search villas"
             />
-          </div>
+          </label>
 
-          <div className="ys5-villa-list">
-            {visible.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className={`ys5-villa-option ${
-                  item.id === selectedId ? "is-active" : ""
-                }`}
-                onClick={() => {
-                  setSelectedId(item.id);
-                  setFeedback("");
-                }}
-              >
-                <img
-                  src={item.images[0]}
-                  alt={`Illustrative ${item.name}`}
-                />
+          <div className="op4-villa-list">
+            {visible.map((stay, index) => {
+              const isOccupied = active.some(
+                (booking) =>
+                  booking.accommodationId === stay.id &&
+                  booking.status === "checked_in" &&
+                  booking.checkIn <= today &&
+                  today < booking.checkOut
+              );
 
-                <span>
-                  <strong>{item.name}</strong>
-                  <small>
-                    {item.maxGuests} guests ·{" "}
-                    {formatPeso(item.nightlyRate)}/night
-                  </small>
-                </span>
+              const blocked =
+                maintenanceBlocks.some(
+                  (block) =>
+                    block.accommodationId === stay.id &&
+                    block.checkIn <= today &&
+                    today < block.checkOut
+                );
 
-                <ArrowUpRight size={17} />
-              </button>
-            ))}
+              return (
+                <button
+                  key={stay.id}
+                  type="button"
+                  onClick={() =>
+                    choose(stay.id)
+                  }
+                  aria-pressed={
+                    selectedId === stay.id
+                  }
+                  className={`op4-villa-choice ${
+                    selectedId === stay.id
+                      ? "is-picked"
+                      : ""
+                  }`}
+                >
+                  <img
+                    src={stay.images[0]}
+                    alt=""
+                    loading="lazy"
+                  />
+
+                  <span>
+                    <small>
+                      0{index + 1} /{" "}
+                      {getZone(
+                        stay.zoneId
+                      )?.label.toUpperCase()}
+                    </small>
+
+                    <strong>{stay.name}</strong>
+
+                    <small>
+                      {formatPeso(
+                        stay.nightlyRate
+                      )}{" "}
+                      / NIGHT
+                    </small>
+                  </span>
+
+                  <b>
+                    {isOccupied
+                      ? "CHECKED IN"
+                      : blocked
+                      ? "BLOCKED TODAY"
+                      : "VIEW DETAILS"}
+                  </b>
+                </button>
+              );
+            })}
+
+            {visible.length === 0 && (
+              <p className="op4-muted">
+                No matching residences.
+              </p>
+            )}
           </div>
         </section>
 
-        <div className="ys5-villa-detail-stack">
-          {stay && (
-            <section className="ys5-panel">
-              <div className="ys5-panel-heading">
-                <div>
-                  <span className="ys5-eyebrow">
-                    SELECTED ACCOMMODATION
-                  </span>
-                  <h2>{stay.name}</h2>
-                  <p>{stay.description}</p>
-                </div>
-                <ShieldCheck size={22} />
-              </div>
+        {/* PROPERTY PRESENTATION */}
 
-              <div className="ys5-villa-detail-photo">
+        <aside className="op4-villa-detail">
+          {chosen && (
+            <>
+              <div className="op4-villa-large-photo">
                 <img
-                  src={stay.images[0]}
-                  alt={`Illustrative ${stay.name}`}
+                  src={chosen.images[0]}
+                  alt={`Illustrative ${chosen.name}`}
                 />
-              </div>
 
-              <div className="ys5-villa-facts">
-                <div>
-                  <span>Nightly demo rate</span>
-                  <strong>{formatPeso(stay.nightlyRate)}</strong>
-                </div>
-                <div>
-                  <span>Maximum guests</span>
-                  <strong>{stay.maxGuests}</strong>
-                </div>
-                <div>
-                  <span>Bedrooms</span>
-                  <strong>{stay.bedrooms}</strong>
-                </div>
-                <div>
-                  <span>Active demo bookings</span>
-                  <strong>{totalConfirmed}</strong>
-                </div>
-              </div>
-
-              <p className="ys5-legal-note">
-                Rates and descriptions are read from the fixed
-                Batch 1 catalog. Editing those values would
-                require updating `src/data/config.js` or
-                extending the shared engine in a later batch.
-              </p>
-            </section>
-          )}
-
-          <section className="ys5-panel">
-            <div className="ys5-panel-heading">
-              <div>
-                <span className="ys5-eyebrow">
-                  BOOKING CONTROL
+                <span>
+                  YOUR STAY / THE VILLA FIELD JOURNAL
                 </span>
-                <h2>Date availability</h2>
-                <p>
-                  Check availability and create maintenance
-                  blocks for the selected villa.
-                </p>
               </div>
-              <Wrench size={22} />
+
+              <div className="op4-panel op4-villa-detail-copy">
+                <span className="op4-eyebrow">
+                  02 / SELECTED RESIDENCE
+                </span>
+
+                <h2>{chosen.name}</h2>
+                <p>{chosen.description}</p>
+
+                <div className="op4-villa-facts">
+                  <div>
+                    <strong>
+                      {chosen.sizeSqm} m²
+                    </strong>
+                    <span>SPACE</span>
+                  </div>
+
+                  <div>
+                    <strong>
+                      {chosen.bedrooms}
+                    </strong>
+                    <span>BEDROOMS</span>
+                  </div>
+
+                  <div>
+                    <strong>
+                      {chosen.maxGuests}
+                    </strong>
+                    <span>MAX GUESTS</span>
+                  </div>
+                </div>
+
+                <div className="op4-villa-detail-meta">
+                  <MapPin size={16} />
+
+                  {getZone(
+                    chosen.zoneId
+                  )?.label}
+
+                  <span>·</span>
+
+                  {
+                    active.filter(
+                      (booking) =>
+                        booking.accommodationId ===
+                        chosen.id
+                    ).length
+                  }{" "}
+                  ACTIVE DEMO BOOKINGS
+                </div>
+
+                <Link
+                  className="op4-text-action"
+                  to={`/stays/${chosen.id}`}
+                >
+                  OPEN PUBLIC PROPERTY JOURNAL
+                  <ArrowUpRight size={16} />
+                </Link>
+              </div>
+            </>
+          )}
+        </aside>
+      </div>
+
+      {/* MAINTENANCE MANAGEMENT */}
+
+      <div className="op4-operations-grid">
+        <section className="op4-panel op4-maintenance-form">
+          <div className="op4-panel-head">
+            <div>
+              <span className="op4-eyebrow">
+                03 / DATE PROTECTION
+              </span>
+
+              <h2>Hold time for care.</h2>
             </div>
 
-            <form onSubmit={createBlock}>
-              <div className="ys5-form-grid">
-                <label className="ys5-field">
-                  <span>START DATE</span>
-                  <input
-                    required
-                    type="date"
-                    min={today}
-                    value={checkIn}
-                    onChange={(event) =>
-                      updateStart(event.target.value)
-                    }
-                  />
-                </label>
+            <Wrench size={22} />
+          </div>
 
-                <label className="ys5-field">
-                  <span>END DATE</span>
-                  <input
-                    required
-                    type="date"
-                    min={checkIn || today}
-                    value={checkOut}
-                    onChange={(event) =>
-                      setCheckOut(event.target.value)
-                    }
-                  />
-                </label>
-              </div>
+          <p className="op4-muted">
+            A maintenance block prevents new demo
+            reservations for those dates. The engine
+            rejects conflicts with existing active
+            reservations.
+          </p>
 
-              <div className="ys5-availability-result">
-                {availability.available ? (
-                  <>
-                    <CheckCircle2 size={19} />
-                    <span>
-                      Available in local demo records
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Ban size={19} />
-                    <span>{availability.reason}</span>
-                  </>
-                )}
-              </div>
+          <form
+            onSubmit={createBlock}
+            className="op4-form-grid"
+          >
+            <label className="op4-field op4-wide">
+              RESIDENCE
 
-              <label className="ys5-field">
-                <span>MAINTENANCE NOTE</span>
-                <input
-                  type="text"
-                  value={note}
-                  maxLength={100}
-                  onChange={(event) =>
-                    setNote(event.target.value)
-                  }
-                  placeholder="e.g. Pool inspection"
-                />
-              </label>
-
-              <button
-                type="submit"
-                className="ys5-button"
-                disabled={!stay || !availability.available}
+              <select
+                value={selectedId}
+                onChange={(event) =>
+                  choose(event.target.value)
+                }
               >
-                <Ban size={17} />
-                Block these dates
-              </button>
+                {accommodations.map((stay) => (
+                  <option
+                    key={stay.id}
+                    value={stay.id}
+                  >
+                    {stay.name}
+                  </option>
+                ))}
+              </select>
+            </label>
 
-              {feedback && (
-                <p className="ys5-feedback" role="status">
-                  {feedback}
-                </p>
-              )}
-            </form>
+            <label className="op4-field">
+              BLOCK FROM
 
-            <div className="ys5-panel-subheading">
-              <h3>Existing maintenance blocks</h3>
+              <input
+                required
+                type="date"
+                min={today}
+                value={from}
+                onChange={(event) => {
+                  const value =
+                    event.target.value;
+
+                  setFrom(value);
+
+                  if (
+                    value &&
+                    to <= value
+                  ) {
+                    setTo(nextDay(value));
+                  }
+                }}
+              />
+            </label>
+
+            <label className="op4-field">
+              BLOCK UNTIL
+
+              <input
+                required
+                type="date"
+                min={nextDay(from)}
+                value={to}
+                onChange={(event) =>
+                  setTo(event.target.value)
+                }
+              />
+            </label>
+
+            <label className="op4-field op4-wide">
+              REASON / MAX 100 CHARACTERS
+
+              <input
+                required
+                maxLength={100}
+                value={note}
+                onChange={(event) =>
+                  setNote(event.target.value)
+                }
+              />
+            </label>
+
+            <div
+              className={`op4-availability op4-wide ${
+                availability?.available
+                  ? "is-free"
+                  : "is-busy"
+              }`}
+            >
+              <ShieldCheck size={17} />
+
               <span>
-                {maintenanceForSelected.length} records
+                {availability?.reason ||
+                  "Choose a valid date range"}
               </span>
             </div>
 
-            {maintenanceForSelected.length === 0 ? (
-              <div className="ys5-empty">
-                <CalendarDays size={27} />
-                <p>No date blocks for this villa.</p>
-              </div>
-            ) : (
-              <div className="ys5-block-list">
-                {maintenanceForSelected.map((block) => (
-                  <div key={block.id}>
-                    <div>
-                      <strong>{block.note}</strong>
-                      <span>
-                        {block.checkIn} → {block.checkOut}
-                      </span>
-                    </div>
+            <button
+              type="submit"
+              className="op4-dark-button op4-wide"
+            >
+              ADD MAINTENANCE BLOCK
+              <CalendarDays size={17} />
+            </button>
+          </form>
 
-                    <button
-                      type="button"
-                      onClick={() => deleteBlock(block)}
-                      aria-label={`Remove ${block.note} block`}
-                    >
-                      <Trash2 size={17} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
+          {feedback && (
+            <p
+              className="op4-feedback"
+              role="status"
+            >
+              {feedback}
+            </p>
+          )}
+        </section>
+
+        {/* MAINTENANCE LOG */}
+
+        <section className="op4-panel">
+          <div className="op4-panel-head">
+            <div>
+              <span className="op4-eyebrow">
+                04 / OPEN MAINTENANCE LOG
+              </span>
+
+              <h2>Protected dates.</h2>
+            </div>
+
+            <span className="op4-outline-mark">
+              {relatedBlocks.length} BLOCKS
+            </span>
+          </div>
+
+          {relatedBlocks.length ? (
+            <div className="op4-maintenance-list">
+              {relatedBlocks.map((block) => (
+                <div key={block.id}>
+                  <span>
+                    <b>
+                      {block.checkIn} →{" "}
+                      {block.checkOut}
+                    </b>
+
+                    <small>
+                      {block.note}
+                    </small>
+                  </span>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      removeBlock(block.id)
+                    }
+                    aria-label={`Remove maintenance block ${block.id}`}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="op4-empty">
+              <CheckCircle2 size={24} />
+              No maintenance blocks for this residence.
+            </div>
+          )}
+
+          <Link
+            className="op4-text-action"
+            to="/staff/calendar"
+          >
+            INSPECT BOOKING TIMELINE
+            <ArrowRight size={16} />
+          </Link>
+        </section>
       </div>
-
-      <p className="ys5-legal-note">
-        Maintenance blocks affect future demo booking
-        availability. Existing active bookings cannot be
-        overlapped by a new maintenance block.
-        All changes are browser-local only.
-      </p>
     </div>
   );
 }

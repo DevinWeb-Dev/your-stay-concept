@@ -1,346 +1,251 @@
-import { useEffect, useState } from "react";
-import {
-  Link,
-  NavLink,
-  Outlet,
-  useLocation,
-} from "react-router-dom";
-
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Outlet, useLocation } from "react-router-dom";
 import {
   ArrowRight,
   ArrowUpRight,
   Compass,
   Heart,
+  LayoutDashboard,
   Menu,
+  MoveUpRight,
   Waves,
   X,
 } from "lucide-react";
-
-import {
-  BRAND,
-  DEMO_NOTICES,
-} from "../data/config.js";
-
+import { BRAND, DEMO_NOTICES } from "../data/config.js";
 import { useResort } from "../context/ResortContext.jsx";
+import "../styles/stay-atlas.css";
 
-const NAV_LINKS = [
-  { label: "Discover", path: "/" },
-  { label: "Villas & Suites", path: "/stays" },
-  { label: "Packages", path: "/packages" },
-  { label: "Offers", path: "/offers" },
-  { label: "Experiences", path: "/experiences" },
-  { label: "Gallery", path: "/gallery" },
-  { label: "Our Story", path: "/story" },
+const links = [
+  { path: "/", label: "Discover", end: true },
+  { path: "/stays", label: "The collection" },
+  { path: "/experiences", label: "Experiences" },
+  { path: "/packages", label: "Packages" },
+  { path: "/offers", label: "Offers" },
+  { path: "/gallery", label: "The journal" },
+  { path: "/story", label: "Our philosophy" },
 ];
 
-export default function PublicLayout() {
-  const { favorites } = useResort();
-  const location = useLocation();
+function Brand({ light = false, onClick }) {
+  return (
+    <Link
+      to="/"
+      className={`tsa-brand ${light ? "tsa-brand--light" : ""}`}
+      onClick={onClick}
+      aria-label="YOUR STAY, return to home"
+    >
+      <span className="tsa-brand__symbol" aria-hidden="true">
+        <Waves size={24} strokeWidth={1.35} />
+      </span>
+      <span className="tsa-brand__text">
+        <strong>YOUR STAY<span>.</span></strong>
+        <small>THE UNHURRIED ATLAS</small>
+      </span>
+    </Link>
+  );
+}
 
-  const [menuOpen, setMenuOpen] = useState(false);
+export default function PublicLayout() {
+  const location = useLocation();
+  const { favorites } = useResort();
+  const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
+  const panelRef = useRef(null);
+  const toggleRef = useRef(null);
+  const previousFocusRef = useRef(null);
 
   useEffect(() => {
-    window.scrollTo({
-      top: 0,
-      behavior: "auto",
-    });
-
-    setMenuOpen(false);
+    setOpen(false);
+    window.scrollTo({ top: 0, behavior: "auto" });
   }, [location.pathname, location.search]);
 
   useEffect(() => {
-    const update = () => setScrolled(window.scrollY > 42);
-
-    update();
-
-    window.addEventListener("scroll", update, {
-      passive: true,
-    });
-
-    return () => window.removeEventListener("scroll", update);
+    const onScroll = () => setScrolled(window.scrollY > 12);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   useEffect(() => {
-    if (!menuOpen) return;
+    if (!open) return;
+    previousFocusRef.current = document.activeElement;
+    const oldOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    panelRef.current?.querySelector("a[href]")?.focus();
 
-    function closeOnEscape(event) {
+    function onKeyDown(event) {
       if (event.key === "Escape") {
-        setMenuOpen(false);
+        setOpen(false);
+        toggleRef.current?.focus();
+        return;
+      }
+      if (event.key !== "Tab" || !panelRef.current) return;
+      const items = [...panelRef.current.querySelectorAll("a[href], button:not([disabled])")]
+        .filter((element) => element.getClientRects().length > 0);
+      if (!items.length) return;
+      if (event.shiftKey && document.activeElement === items[0]) {
+        event.preventDefault();
+        items.at(-1).focus();
+      } else if (!event.shiftKey && document.activeElement === items.at(-1)) {
+        event.preventDefault();
+        items[0].focus();
       }
     }
-
-    document.addEventListener("keydown", closeOnEscape);
-
+    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener(
-        "keydown",
-        closeOnEscape
-      );
+      document.body.style.overflow = oldOverflow;
+      document.removeEventListener("keydown", onKeyDown);
+      if (previousFocusRef.current?.isConnected) previousFocusRef.current.focus();
     };
-  }, [menuOpen]);
-
-  const transparent =
-    location.pathname === "/" &&
-    !scrolled &&
-    !menuOpen;
+  }, [open]);
 
   return (
-    <div className="ys-site" id="top">
-      <button
-        className="ys-skip"
-        type="button"
-        onClick={() =>
-          document.getElementById("main-content")?.focus()
-        }
-      >
-        Skip to content
-      </button>
+    <div className="ys-site tsa-site" id="top">
+      <a href="#main-content" className="tsa-skip">Skip to content</a>
+      <div className="tsa-issue-strip">
+        <span>YOUR STAY / COASTAL COLLECTION</span>
+        <span>NOT ALL WHO WANDER NEED TO HURRY</span>
+        <span>A DEV CODEWORKS CONCEPT · 2026</span>
+      </div>
 
-      <header
-        className={`ys-header ${
-          transparent
-            ? "ys-header--over-hero"
-            : "ys-header--solid"
-        }`}
-      >
-        <div className="ys-header__inner ys-shell">
-          <Link
-            to="/"
-            className="ys-brand"
-            aria-label="YOUR STAY home"
-          >
-            <span
-              className="ys-brand__mark"
-              aria-hidden="true"
-            >
-              <Waves size={23} strokeWidth={1.5} />
-            </span>
-
-            <span className="ys-brand__name">
-              YOUR STAY
-              <span className="ys-brand__dot">.</span>
-            </span>
-          </Link>
-
-          <nav
-            className="ys-desktop-nav"
-            aria-label="Main navigation"
-          >
-            {NAV_LINKS.map((item) => (
+      <header className={`tsa-header ${scrolled ? "is-scrolled" : ""}`}>
+        <div className="tsa-header__inner">
+          <Brand />
+          <nav className="tsa-header__nav" aria-label="Main navigation">
+            {links.slice(0, 5).map((item) => (
               <NavLink
                 key={item.path}
                 to={item.path}
-                end={item.path === "/"}
-                className={({ isActive }) =>
-                  `ys-nav-link ${
-                    isActive ? "is-current" : ""
-                  }`
-                }
+                end={item.end}
+                className={({ isActive }) => `tsa-header__link ${isActive ? "is-active" : ""}`}
               >
                 {item.label}
               </NavLink>
             ))}
           </nav>
-
-          <div className="ys-header__actions">
+          <div className="tsa-header__actions">
             <Link
+              className="tsa-header__saved"
               to="/stays?favorites=1"
-              className="ys-icon-link"
-              aria-label={`View saved stays, ${favorites.length} selected`}
+              aria-label={`View ${favorites.length} saved stays`}
             >
-              <Heart size={19} strokeWidth={1.65} />
-
-              {favorites.length > 0 && (
-                <span className="ys-heart-count">
-                  {favorites.length}
-                </span>
-              )}
+              <Heart size={20} strokeWidth={1.7} />
+              {favorites.length > 0 && <b>{favorites.length}</b>}
             </Link>
-
-            <Link
-              to="/booking"
-              className="ys-header__reserve"
-            >
-              Reserve a stay
-              <ArrowUpRight size={16} />
+            <Link className="tsa-header__staff" to="/staff">
+              <LayoutDashboard size={16} /> Staff demo
             </Link>
-
+            <Link className="tsa-header__book" to="/booking">
+              Plan your escape <ArrowUpRight size={17} />
+            </Link>
             <button
+              className="tsa-header__menu"
               type="button"
-              className="ys-menu-toggle"
-              aria-expanded={menuOpen}
-              aria-controls="ys-mobile-menu"
-              aria-label={
-                menuOpen ? "Close menu" : "Open menu"
-              }
-              onClick={() =>
-                setMenuOpen((current) => !current)
-              }
+              ref={toggleRef}
+              aria-label={open ? "Close navigation" : "Open navigation"}
+              aria-expanded={open}
+              aria-controls="tsa-drawer"
+              onClick={() => setOpen((value) => !value)}
             >
-              {menuOpen ? (
-                <X size={25} />
-              ) : (
-                <Menu size={25} />
-              )}
+              {open ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
         </div>
       </header>
 
-      <div
-        id="ys-mobile-menu"
-        className={`ys-mobile-menu ${
-          menuOpen ? "is-open" : ""
-        }`}
-        aria-hidden={!menuOpen}
+      {open && (
+        <button
+          className="tsa-drawer__backdrop"
+          type="button"
+          aria-label="Close navigation menu"
+          onClick={() => setOpen(false)}
+        />
+      )}
+      <aside
+        id="tsa-drawer"
+        className={`tsa-drawer ${open ? "is-open" : ""}`}
+        ref={panelRef}
+        inert={!open}
+        role={open ? "dialog" : undefined}
+        aria-modal={open ? "true" : undefined}
+        aria-label="Site navigation"
       >
-        <nav
-          className="ys-mobile-menu__nav"
-          aria-label="Mobile navigation"
-        >
-          <span className="ys-kicker">
-            YOUR NEXT ESCAPE
-          </span>
-
-          {NAV_LINKS.map((item, index) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              tabIndex={menuOpen ? 0 : -1}
-              onClick={() => setMenuOpen(false)}
-            >
-              <span className="ys-mobile-menu__num">
-                {String(index + 1).padStart(2, "0")}
-              </span>
-
-              {item.label}
-
-              <ArrowUpRight
-                size={21}
-                strokeWidth={1.4}
-              />
+        <div className="tsa-drawer__top">
+          <span>THE DESTINATION INDEX / VOL. 01</span>
+          <button type="button" onClick={() => setOpen(false)} aria-label="Close menu"><X size={22} /></button>
+        </div>
+        <nav aria-label="Expanded navigation" className="tsa-drawer__links">
+          {links.map((item, index) => (
+            <NavLink key={item.path} to={item.path} end={item.end}>
+              <small>{String(index + 1).padStart(2, "0")}</small>
+              <strong>{item.label}</strong>
+              <MoveUpRight size={21} />
             </NavLink>
           ))}
-
-          <NavLink
-            to="/contact"
-            tabIndex={menuOpen ? 0 : -1}
-            onClick={() => setMenuOpen(false)}
-          >
-            <span className="ys-mobile-menu__num">
-              08
-            </span>
-
-            Contact
-
-            <ArrowUpRight size={21} />
-          </NavLink>
-
-          <Link
-            className="ys-mobile-menu__cta"
-            to="/booking"
-            tabIndex={menuOpen ? 0 : -1}
-            onClick={() => setMenuOpen(false)}
-          >
-            Explore booking
-            <ArrowRight size={17} />
-          </Link>
         </nav>
-      </div>
+        <div className="tsa-drawer__bottom">
+          <Link to="/contact">Contact us <ArrowUpRight size={16} /></Link>
+          <Link to="/staff"><LayoutDashboard size={17} /> Enter staff demo <ArrowUpRight size={16} /></Link>
+          <span>EXPLORATION, REIMAGINED.</span>
+        </div>
+      </aside>
 
-      <main
-        id="main-content"
-        tabIndex={-1}
-        className="ys-main"
-      >
+      <main id="main-content" className="ys-main" tabIndex={-1}>
         <Outlet />
       </main>
 
-      <footer className="ys-footer">
-        <div className="ys-shell">
-          <div className="ys-footer__top">
-            <div>
-              <span className="ys-kicker ys-kicker--light">
-                A DIFFERENT PACE OF LIFE
-              </span>
-
-              <h2>
-                Some places
-                <br />
-                <em>stay with you.</em>
-              </h2>
-            </div>
-
-            <Link
-              to="/stays"
-              className="ys-circle-cta"
-              aria-label="Explore stays"
-            >
-              <ArrowUpRight size={27} />
-            </Link>
-          </div>
-
-          <div className="ys-footer__grid">
-            <div className="ys-footer__identity">
-              <Link
-                to="/"
-                className="ys-footer__wordmark"
-              >
-                YOUR STAY.
-              </Link>
-
-              <p>{BRAND.tagline}</p>
-            </div>
-
-            <div className="ys-footer__links">
-              <span>Explore</span>
-              <Link to="/stays">The stays</Link>
-              <Link to="/packages">Packages</Link>
-              <Link to="/offers">Special offers</Link>
-              <Link to="/experiences">Experiences</Link>
-            </div>
-
-            <div className="ys-footer__links">
-              <span>Discover</span>
-              <Link to="/gallery">Gallery</Link>
-              <Link to="/story">Our story</Link>
-              <Link to="/contact">Contact</Link>
-              <Link to="/stays?favorites=1">Saved stays</Link>
-            </div>
-
-            <div className="ys-footer__note">
-              <Compass
-                size={24}
-                strokeWidth={1.3}
-              />
-
-              <p>
-                Made for slow mornings, open skies
-                and the beautiful art of doing less.
-              </p>
-
-              <span>
-                Resort concept · Philippines-inspired
-              </span>
-            </div>
-          </div>
-
-          <div className="ys-footer__bottom">
-            <span>
-              © {new Date().getFullYear()}{" "}
-              {BRAND.name} — Concept only
-            </span>
-
-            <span>{BRAND.developerCredit}</span>
-          </div>
-
-          <p className="ys-footer__disclaimer">
-            {DEMO_NOTICES.booking}{" "}
-            {DEMO_NOTICES.images}
-          </p>
+      <section className="tsa-between" aria-label="Explore the resort management demo">
+        <div>
+          <span className="tsa-micro">FOR BUSINESS OWNERS / THE OTHER SIDE OF THE STAY</span>
+          <h2>The guest sees paradise.<br /><em>You see the whole picture.</em></h2>
         </div>
+        <Link to="/staff">Enter management demo <ArrowUpRight size={19} /></Link>
+      </section>
+
+      <footer className="tsa-footer">
+        <div className="tsa-footer__intro">
+          <span className="tsa-micro">ISSUE 01 · A PLACE TO REMEMBER</span>
+          <h2>Meet me <em>elsewhere.</em></h2>
+          <Link to="/stays" aria-label="Discover the villa collection"><ArrowUpRight size={33} /></Link>
+        </div>
+        <div className="tsa-footer__columns">
+          <div className="tsa-footer__identity">
+            <Brand light />
+            <p>{BRAND.tagline}</p>
+          </div>
+          <div className="tsa-footer__column">
+            <strong>THE DESTINATIONS</strong>
+            <Link to="/stays">Villas & suites</Link>
+            <Link to="/packages">Packages</Link>
+            <Link to="/offers">Seasonal offers</Link>
+            <Link to="/experiences">Experiences</Link>
+            <Link to="/booking">Booking demo</Link>
+          </div>
+          <div className="tsa-footer__column">
+            <strong>THE JOURNAL</strong>
+            <Link to="/gallery">Gallery</Link>
+            <Link to="/story">Our story</Link>
+            <Link to="/contact">Contact</Link>
+            <Link to="/stays?favorites=1">Saved stays</Link>
+            <Link to="/staff">Staff dashboard</Link>
+          </div>
+          <div className="tsa-footer__note">
+            <Compass size={25} strokeWidth={1.2} />
+            <p>Made for people who believe a change of scenery can change everything.</p>
+            <small>Philippines-inspired / Fictional resort concept</small>
+          </div>
+        </div>
+        <div className="tsa-footer__legal">
+          <span>© {new Date().getFullYear()} YOUR STAY. · DESIGN CONCEPT</span>
+          <span>{BRAND.developerCredit}</span>
+        </div>
+        <p className="tsa-footer__disclaimer">{DEMO_NOTICES.booking} {DEMO_NOTICES.images} {DEMO_NOTICES.payment}</p>
       </footer>
+
+      <Link className="tsa-staff-float" to="/staff" aria-label="Open the interactive resort management dashboard">
+        <LayoutDashboard size={19} />
+        <span>EXPLORE STAFF DEMO</span>
+        <ArrowUpRight size={17} />
+      </Link>
     </div>
   );
 }

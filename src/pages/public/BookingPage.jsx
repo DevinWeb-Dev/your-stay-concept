@@ -1,50 +1,64 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
+
 import {
+  ArrowDownRight,
   ArrowRight,
+  ArrowUpRight,
   CalendarDays,
+  Check,
   CheckCircle2,
-  ChevronRight,
+  Clock3,
+  Copy,
+  Minus,
+  Plus,
   ShieldCheck,
-  TicketCheck,
+  Sparkles,
+  Ticket,
   Trash2,
   Users,
+  Waves,
 } from "lucide-react";
 
 import {
-  ACCOMMODATIONS,
   ADD_ONS,
   DEMO_NOTICES,
+  PHOTOS,
   RESORT_POLICIES,
   formatPeso,
+  getZone,
 } from "../../data/config.js";
 
-import { localDateKey } from "../../engine/resortEngine.js";
 import { useResort } from "../../context/ResortContext.jsx";
 
-function dateFromNow(days) {
-  const date = new Date();
-  date.setHours(12, 0, 0, 0);
-  date.setDate(date.getDate() + days);
-  return localDateKey(date);
-}
+import {
+  JOURNEY_PACKAGES,
+  JOURNEY_OFFERS,
+  dateAfter,
+  addDays,
+  prettyDay,
+  offerPreview,
+} from "../../data/stayJourneys.js";
 
-function nextDay(value) {
-  const date = new Date(`${value}T12:00:00`);
-  date.setDate(date.getDate() + 1);
-  return localDateKey(date);
-}
+import {
+  CoastalContours,
+  Reveal,
+  TideCompass,
+} from "../../components/StayMotion.jsx";
 
-function prettyDate(value) {
-  if (!value) return "—";
+import "../../styles/stay-booking-architectural.css";
 
-  return new Date(`${value}T12:00:00`).toLocaleDateString(
-    "en-PH",
-    {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    }
+const validExtras = (ids) =>
+  [...new Set(ids)].filter((id) =>
+    ADD_ONS.some((a) => a.id === id)
+  );
+
+function Readout({ label, value }) {
+  return (
+    <div className="ar3-readout">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
   );
 }
 
@@ -58,499 +72,949 @@ export default function BookingPage() {
     getQuote,
   } = useResort();
 
-  const initialStay = params.get("stay");
-  const validStay = accommodations.some(
-    (stay) => stay.id === initialStay
+  const ready = useRef(null);
+
+  const requestedPackage = JOURNEY_PACKAGES.find(
+    (p) => p.id === params.get("package")
   );
 
-  const [stayId, setStayId] = useState(
-    validStay ? initialStay : accommodations[0]?.id || ""
+  const requestedOffer = JOURNEY_OFFERS.find(
+    (o) => o.id === params.get("offer")
+  );
+
+  const requestedStay = params.get("stay");
+
+  const [stayId, setStayId] = useState(() =>
+    accommodations.some((s) => s.id === requestedStay)
+      ? requestedStay
+      : accommodations[0]?.id || ""
   );
 
   const [checkIn, setCheckIn] = useState(
-    params.get("checkIn") || dateFromNow(2)
+    () => params.get("checkIn") || dateAfter(3)
   );
 
   const [checkOut, setCheckOut] = useState(
-    params.get("checkOut") || dateFromNow(3)
+    () => params.get("checkOut") || dateAfter(5)
   );
 
   const [guests, setGuests] = useState(
-    Number(params.get("guests")) || 2
+    () =>
+      Number(params.get("guests")) ||
+      requestedPackage?.guests ||
+      2
   );
 
-  const [addOnIds, setAddOnIds] = useState(() => {
-    const ids = (params.get("addOns") || "")
-      .split(",")
-      .filter(Boolean);
-
-    return [...new Set(ids)].filter((id) =>
-      ADD_ONS.some((addon) => addon.id === id)
-    );
-  });
+  const [addOnIds, setAddOnIds] = useState(() =>
+    validExtras(
+      params.has("addOns")
+        ? (params.get("addOns") || "").split(",")
+        : requestedPackage?.addOnIds || []
+    )
+  );
 
   const [guestName, setGuestName] = useState("");
   const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [confirmed, setConfirmed] = useState(null);
+  const [accepted, setAccepted] = useState(false);
+  const [error, setError] = useState("");
+  const [result, setResult] = useState(null);
+  const [copyLabel, setCopyLabel] = useState("COPY REFERENCE");
 
-  const stay = ACCOMMODATIONS.find(
-    (item) => item.id === stayId
-  );
+  const stay = accommodations.find((s) => s.id === stayId);
 
   const actualGuests = Math.min(
-    Math.max(1, guests),
+    Math.max(Number(guests) || 1, 1),
     stay?.maxGuests || 1
   );
 
   const quote = stay
     ? getQuote({
-        accommodationId: stayId,
+        accommodationId: stay.id,
         checkIn,
         checkOut,
         guests: actualGuests,
         addOnIds,
       })
-    : { ok: false, error: "Choose an accommodation." };
+    : {
+        ok: false,
+        error: "Select a residence.",
+      };
+
+  const contextPackage =
+    requestedPackage?.stayId === stayId
+      ? requestedPackage
+      : null;
+
+  const contextOffer =
+    requestedOffer?.stayId === stayId
+      ? requestedOffer
+      : null;
+
+  const offer = offerPreview(contextOffer, quote);
+
+  const history = useMemo(
+    () => [...reservations].reverse().slice(0, 6),
+    [reservations]
+  );
 
   useEffect(() => {
-    document.title = "Reserve Your Escape | YOUR STAY";
+    document.title = "The Reservation Atelier | YOUR STAY.";
+
     return () => {
-      document.title = "YOUR STAY";
+      document.title = "YOUR STAY.";
     };
   }, []);
 
-  function changeCheckIn(value) {
+  useEffect(() => {
+    if (result) {
+      ready.current?.scrollIntoView({
+        behavior: window.matchMedia(
+          "(prefers-reduced-motion: reduce)"
+        ).matches
+          ? "auto"
+          : "smooth",
+        block: "center",
+      });
+    }
+  }, [result]);
+
+  const clearFeedback = () => {
+    setError("");
+    setResult(null);
+  };
+
+  function changeArrival(value) {
+    clearFeedback();
     setCheckIn(value);
 
     if (value && checkOut <= value) {
-      setCheckOut(nextDay(value));
+      setCheckOut(addDays(value, 1));
     }
   }
 
-  function toggleAddon(id) {
-    setAddOnIds((current) =>
-      current.includes(id)
-        ? current.filter((item) => item !== id)
-        : [...current, id]
+  function chooseStay(id) {
+    const next = accommodations.find((s) => s.id === id);
+    if (!next) return;
+
+    clearFeedback();
+    setStayId(id);
+    setGuests((g) => Math.min(g, next.maxGuests));
+  }
+
+  function toggleExtra(id) {
+    clearFeedback();
+
+    setAddOnIds((old) =>
+      old.includes(id)
+        ? old.filter((x) => x !== id)
+        : [...old, id]
     );
   }
 
-  function submitBooking(event) {
+  function save(event) {
     event.preventDefault();
-    setMessage("");
-    setConfirmed(null);
+    clearFeedback();
 
     if (!quote.ok) {
-      setMessage(quote.error);
+      setError(quote.error);
       return;
     }
 
-    const result = actions.reserveStay({
-      accommodationId: stayId,
+    if (!accepted) {
+      setError(
+        "Please acknowledge the local demo conditions."
+      );
+      return;
+    }
+
+    const response = actions.reserveStay({
+      accommodationId: stay.id,
       checkIn,
       checkOut,
       guests: actualGuests,
+      addOnIds,
       guestName: guestName.trim(),
       email: email.trim(),
-      addOnIds,
     });
 
-    if (result.ok && result.booking) {
-      setConfirmed(result.booking);
-      setMessage("");
-    } else {
-      setMessage(result.error || "Unable to create demo booking.");
+    if (!response.ok) {
+      setError(
+        response.error ||
+          "The local demo could not save this reservation."
+      );
+      return;
     }
+
+    setResult(response.booking);
   }
 
-  function cancelBooking(id) {
+  function cancel(id) {
     if (
       !window.confirm(
-        "Cancel this reservation in the local demo?"
+        "Cancel this local demonstration reservation?"
       )
     ) {
       return;
     }
 
-    const result = actions.cancelReservation(id);
+    const response = actions.cancelReservation(id);
 
-    if (!result.ok) {
-      setMessage(result.error);
+    if (!response.ok) {
+      setError(
+        response.error ||
+          "Unable to cancel the local record."
+      );
     } else {
-      setMessage("Demo reservation cancelled.");
-      setConfirmed(null);
+      setError("");
+      setResult((old) => (old?.id === id ? null : old));
     }
   }
 
-  const history = [...reservations].reverse();
+  async function copyReference() {
+    if (!result) return;
+
+    try {
+      await navigator.clipboard.writeText(result.id);
+      setCopyLabel("COPIED");
+    } catch {
+      setCopyLabel("SELECT & COPY THE REFERENCE");
+    }
+  }
 
   return (
-    <div className="ys3-page">
-      <section className="ys3-booking-hero">
-        <div className="ys3-shell">
-          <span className="ys-kicker ys-kicker--light">
-            YOUR NEXT CHAPTER
+    <div className="ar3 ar3-booking">
+      {/* ARCHITECTURAL ARRIVAL */}
+
+      <section
+        className="ar3-book-cover"
+        aria-labelledby="ar3-book-title"
+      >
+        <div className="ar3-book-cover__copy">
+          <span className="ar3-overline">
+            THE UNHURRIED ATLAS <i /> CHAPTER 03
           </span>
 
-          <h1 className="ys3-title">
-            Book your <em>somewhere.</em>
+          <div
+            className="ar3-book-cover__numbers"
+            aria-hidden="true"
+          >
+            03 / RESERVATIONS
+          </div>
+
+          <h1 id="ar3-book-title">
+            Your days, <em>beautifully</em> arranged.
           </h1>
 
           <p>
-            A little escape, designed around you.
-            Plan your stay and preview your booking.
+            The reservation atelier. Choose the
+            residence, the moments and the people.
+            We will compose your stay into one
+            considered journey.
           </p>
+
+          <a
+            href="#ar3-reserve"
+            className="ar3-underlined"
+          >
+            COMPOSE YOUR ITINERARY
+            <ArrowDownRight size={19} />
+          </a>
+
+          <div className="ar3-book-cover__foot">
+            <span>
+              DESIGNED FOR THE SPACE BETWEEN PLACES
+            </span>
+            <span>YS — 03 / 06</span>
+          </div>
+        </div>
+
+        <div className="ar3-book-cover__photo">
+          <img
+            src={stay?.images[0] || PHOTOS.hero}
+            alt="Illustrative coastal resort villa architecture"
+          />
+
+          <CoastalContours pale />
+
+          <div className="ar3-book-cover__seal">
+            <TideCompass />
+            <span>WHERE THE TIME GOES SLOWER</span>
+          </div>
+
+          <span className="ar3-photo-caption">
+            A TRAVEL STUDY / YOUR STAY. 2026
+          </span>
         </div>
       </section>
 
-      <div className="ys3-shell ys3-section">
-        <div className="ys3-booking-grid">
-          <form
-            className="ys3-panel ys3-bookform"
-            onSubmit={submitBooking}
-          >
-            <span className="ys-kicker">01 / ACCOMMODATION</span>
-            <h2 className="ys3-subheading">Choose your escape.</h2>
+      {/* TRAVEL DOCUMENT STAGES */}
 
-            <label className="ys3-field">
-              <span>YOUR VILLA OR SUITE</span>
-              <select
-                value={stayId}
-                onChange={(e) => {
-                  setStayId(e.target.value);
-                  setMessage("");
-                  setConfirmed(null);
-                }}
-              >
-                {accommodations.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} — {formatPeso(item.nightlyRate)}/night
-                  </option>
-                ))}
-              </select>
-            </label>
+      <section
+        className="ar3-journey-rail"
+        aria-label="Reservation stages"
+      >
+        {[
+          "THE RESIDENCE",
+          "THE MOMENTS",
+          "THE TRAVELER",
+          "THE ITINERARY",
+        ].map((name, i) => (
+          <a key={name} href={`#ar3-step-${i + 1}`}>
+            <span>0{i + 1}</span>
+            {name}
+            <ArrowUpRight size={13} />
+          </a>
+        ))}
+      </section>
 
-            {stay && (
-              <Link
-                to={`/stays/${stay.id}`}
-                className="ys3-selected-stay"
-              >
-                <img
-                  src={stay.images[0]}
-                  alt={`Illustrative ${stay.name}`}
-                />
-                <span>
-                  <strong>{stay.name}</strong>
-                  <small>
-                    {stay.bedrooms} bedroom(s) · Up to{" "}
-                    {stay.maxGuests} guests
-                  </small>
-                </span>
-                <ChevronRight size={19} />
-              </Link>
-            )}
+      <section
+        className="ar3-reservation-layout ar3-container"
+        id="ar3-reserve"
+      >
+        <div className="ar3-reservation-form-column">
+          <Reveal className="ar3-section-heading">
+            <span className="ar3-overline">
+              01 — YOUR RESERVATION JOURNAL
+            </span>
 
-            <div className="ys3-rule" />
-
-            <span className="ys-kicker">02 / TRAVEL DATES</span>
-            <h2 className="ys3-subheading">
-              When shall we <em>meet?</em>
+            <h2>
+              Every great stay begins with{" "}
+              <em>a little intention.</em>
             </h2>
 
-            <div className="ys3-form-grid">
-              <label className="ys3-field">
-                <span>CHECK IN</span>
-                <input
-                  required
-                  type="date"
-                  min={dateFromNow(0)}
-                  value={checkIn}
-                  onChange={(e) => changeCheckIn(e.target.value)}
-                />
-              </label>
+            <p>
+              Dates and pricing are calculated from the
+              original local resort engine. No live
+              property is connected.
+            </p>
+          </Reveal>
 
-              <label className="ys3-field">
-                <span>CHECK OUT</span>
-                <input
-                  required
-                  type="date"
-                  min={checkIn || dateFromNow(1)}
-                  value={checkOut}
-                  onChange={(e) => setCheckOut(e.target.value)}
-                />
-              </label>
-
-              <label className="ys3-field ys3-full">
-                <span>NUMBER OF GUESTS</span>
-                <select
-                  value={actualGuests}
-                  onChange={(e) => setGuests(Number(e.target.value))}
-                >
-                  {Array.from(
-                    { length: stay?.maxGuests || 1 },
-                    (_, i) => i + 1
-                  ).map((number) => (
-                    <option key={number} value={number}>
-                      {number} {number === 1 ? "Guest" : "Guests"}
-                    </option>
-                  ))}
-                </select>
-              </label>
+          {contextPackage && (
+            <div className="ar3-context">
+              <Sparkles size={18} />
+              <span>
+                <b>{contextPackage.title}</b> /
+                Curated package selections carried
+                into your quote.
+              </span>
             </div>
+          )}
 
-            <div className="ys3-rule" />
+          {contextOffer && (
+            <div className="ar3-context ar3-context--offer">
+              <Ticket size={18} />
+              <span>
+                <b>{contextOffer.title}</b> /
+                Sample promotional preview only.
+                No discount is redeemed.
+              </span>
+            </div>
+          )}
 
-            <span className="ys-kicker">03 / THE LITTLE EXTRAS</span>
-            <h2 className="ys3-subheading">
-              Make it <em>personal.</em>
-            </h2>
+          <form onSubmit={save} className="ar3-form">
+            {/* RESIDENCE SELECTOR */}
 
-            <div className="ys3-addons">
-              {ADD_ONS.map((addon) => (
-                <label className="ys3-addon" key={addon.id}>
-                  <input
-                    type="checkbox"
-                    checked={addOnIds.includes(addon.id)}
-                    onChange={() => toggleAddon(addon.id)}
-                  />
+            <section
+              className="ar3-chapter"
+              id="ar3-step-1"
+            >
+              <header>
+                <span>01 / THE PLACE</span>
+                <h3>
+                  Choose your <em>horizon.</em>
+                </h3>
+              </header>
 
+              <div
+                className="ar3-residence-picker"
+                role="group"
+                aria-label="Choose residence"
+              >
+                {accommodations.map((item, i) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    onClick={() => chooseStay(item.id)}
+                    aria-pressed={stayId === item.id}
+                    className={
+                      stayId === item.id
+                        ? "is-current"
+                        : ""
+                    }
+                  >
+                    <img
+                      src={item.images[0]}
+                      alt=""
+                      loading="lazy"
+                    />
+
+                    <span>
+                      <small>RESIDENCE / 0{i + 1}</small>
+                      <strong>{item.name}</strong>
+                      <small>
+                        {formatPeso(item.nightlyRate)} / NIGHT
+                      </small>
+                    </span>
+
+                    <span className="ar3-residence-picker__check">
+                      {stayId === item.id ? (
+                        <Check size={17} />
+                      ) : (
+                        <Plus size={17} />
+                      )}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="ar3-date-bar">
+                <label>
                   <span>
-                    <strong>{addon.name}</strong>
-                    <small>{addon.description}</small>
+                    <CalendarDays size={15} />
+                    ARRIVAL
                   </span>
 
-                  <b>
-                    {addon.price
-                      ? `+${formatPeso(addon.price)}`
-                      : "Request"}
-                  </b>
+                  <input
+                    type="date"
+                    min={dateAfter(0)}
+                    required
+                    value={checkIn}
+                    onChange={(e) =>
+                      changeArrival(e.target.value)
+                    }
+                  />
                 </label>
-              ))}
-            </div>
 
-            <div className="ys3-rule" />
+                <label>
+                  <span>
+                    <CalendarDays size={15} />
+                    DEPARTURE
+                  </span>
 
-            <span className="ys-kicker">04 / GUEST INFORMATION</span>
-            <h2 className="ys3-subheading">Almost paradise.</h2>
+                  <input
+                    type="date"
+                    min={
+                      checkIn
+                        ? addDays(checkIn, 1)
+                        : dateAfter(1)
+                    }
+                    required
+                    value={checkOut}
+                    onChange={(e) => {
+                      clearFeedback();
+                      setCheckOut(e.target.value);
+                    }}
+                  />
+                </label>
 
-            <div className="ys3-form-grid">
-              <label className="ys3-field ys3-full">
-                <span>FULL NAME</span>
-                <input
-                  type="text"
-                  value={guestName}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  required
-                  minLength={2}
-                  maxLength={80}
-                  autoComplete="name"
-                  placeholder="Your name"
-                />
-              </label>
+                <div className="ar3-guests">
+                  <span>
+                    <Users size={15} />
+                    TRAVELERS
+                  </span>
 
-              <label className="ys3-field ys3-full">
-                <span>EMAIL ADDRESS</span>
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                  autoComplete="email"
-                  placeholder="you@example.com"
-                />
-              </label>
-            </div>
-
-            <p className="ys3-disclaimer">
-              This information is saved only in your browser's
-              local demo records. Use sample details, not real
-              personal information.
-            </p>
-
-            {message && (
-              <div className="ys3-error" role="alert">
-                {message}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              className="ys3-btn ys3-btn--wide"
-              disabled={!quote.ok}
-            >
-              <TicketCheck size={19} />
-              Confirm demo reservation
-              <ArrowRight size={18} />
-            </button>
-
-            <div className="ys3-trust">
-              <ShieldCheck size={17} />
-              No actual reservation or payment will be made.
-            </div>
-          </form>
-
-          <aside className="ys3-booksummary">
-            <div className="ys3-panel">
-              <span className="ys-kicker">YOUR STAY SUMMARY</span>
-              <h2 className="ys3-subheading">
-                Your escape, <em>at a glance.</em>
-              </h2>
-
-              {stay && (
-                <img
-                  className="ys3-summary-photo"
-                  src={stay.images[0]}
-                  alt={`Illustrative view of ${stay.name}`}
-                />
-              )}
-
-              <h3>{stay?.name}</h3>
-
-              <div className="ys3-summary-data">
-                <div>
-                  <CalendarDays size={17} />
-                  {prettyDate(checkIn)} — {prettyDate(checkOut)}
-                </div>
-                <div>
-                  <Users size={17} />
-                  {actualGuests} guest(s)
-                </div>
-              </div>
-
-              {quote.ok ? (
-                <div className="ys3-price-breakdown">
                   <div>
-                    <span>{quote.nights} night(s)</span>
-                    <span>{formatPeso(quote.nightlySubtotal)}</span>
-                  </div>
+                    <button
+                      type="button"
+                      aria-label="One fewer guest"
+                      disabled={actualGuests <= 1}
+                      onClick={() => {
+                        clearFeedback();
+                        setGuests((g) =>
+                          Math.max(1, g - 1)
+                        );
+                      }}
+                    >
+                      <Minus size={16} />
+                    </button>
 
-                  {quote.extraGuestTotal > 0 && (
-                    <div>
-                      <span>Extra guests</span>
-                      <span>
-                        {formatPeso(quote.extraGuestTotal)}
-                      </span>
-                    </div>
-                  )}
+                    <strong>
+                      {actualGuests}{" "}
+                      {actualGuests === 1
+                        ? "GUEST"
+                        : "GUESTS"}
+                    </strong>
 
-                  {quote.addOnTotal > 0 && (
-                    <div>
-                      <span>Experience add-ons</span>
-                      <span>{formatPeso(quote.addOnTotal)}</span>
-                    </div>
-                  )}
-
-                  <div className="ys3-total">
-                    <strong>Estimated total</strong>
-                    <strong>{formatPeso(quote.total)}</strong>
+                    <button
+                      type="button"
+                      aria-label="One more guest"
+                      disabled={
+                        actualGuests >=
+                        (stay?.maxGuests || 1)
+                      }
+                      onClick={() => {
+                        clearFeedback();
+                        setGuests((g) =>
+                          Math.min(
+                            stay.maxGuests,
+                            g + 1
+                          )
+                        );
+                      }}
+                    >
+                      <Plus size={16} />
+                    </button>
                   </div>
                 </div>
-              ) : (
-                <p className="ys3-error" role="status">
-                  {quote.error}
+              </div>
+
+              <div className="ar3-policy-strip">
+                <Clock3 size={17} />
+                <span>
+                  ARRIVAL {RESORT_POLICIES.checkInTime}
+                  {" / "}
+                  DEPARTURE {RESORT_POLICIES.checkOutTime}
+                  {" / "}
+                  MAX {RESORT_POLICIES.maximumNights} NIGHTS
+                </span>
+              </div>
+            </section>
+
+            {/* OPTIONAL EXPERIENCES */}
+
+            <section
+              className="ar3-chapter"
+              id="ar3-step-2"
+            >
+              <header>
+                <span>02 / PERSONAL TOUCHES</span>
+
+                <h3>
+                  The things <em>you'll remember.</em>
+                </h3>
+
+                <p>
+                  Add-ons are charged once per reservation,
+                  as defined by the demonstration engine.
+                </p>
+              </header>
+
+              <div className="ar3-experience-choices">
+                {ADD_ONS.map((addon, index) => (
+                  <label
+                    key={addon.id}
+                    className={
+                      addOnIds.includes(addon.id)
+                        ? "is-selected"
+                        : ""
+                    }
+                  >
+                    <input
+                      type="checkbox"
+                      checked={addOnIds.includes(addon.id)}
+                      onChange={() =>
+                        toggleExtra(addon.id)
+                      }
+                    />
+
+                    <span className="ar3-experience-choices__number">
+                      0{index + 1}
+                    </span>
+
+                    <span className="ar3-experience-choices__copy">
+                      <strong>{addon.name}</strong>
+                      <small>{addon.description}</small>
+                    </span>
+
+                    <span className="ar3-experience-choices__rate">
+                      {addon.price
+                        ? `+${formatPeso(addon.price)}`
+                        : "REQUEST ONLY"}
+                    </span>
+
+                    <span className="ar3-choice-mark">
+                      {addOnIds.includes(addon.id) ? (
+                        <Check size={17} />
+                      ) : (
+                        <Plus size={17} />
+                      )}
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </section>
+
+            {/* TRAVELER DETAILS */}
+
+            <section
+              className="ar3-chapter"
+              id="ar3-step-3"
+            >
+              <header>
+                <span>03 / THE TRAVELER</span>
+
+                <h3>
+                  A name for <em>your postcard.</em>
+                </h3>
+
+                <p>
+                  For privacy, please use fictional
+                  sample details. The demo saves the name
+                  and email in this browser only.
+                </p>
+              </header>
+
+              <div className="ar3-traveler-fields">
+                <label>
+                  GUEST NAME
+                  <input
+                    required
+                    minLength={2}
+                    maxLength={80}
+                    autoComplete="off"
+                    value={guestName}
+                    placeholder="Sample Traveler"
+                    onChange={(e) =>
+                      setGuestName(e.target.value)
+                    }
+                  />
+                </label>
+
+                <label>
+                  SAMPLE EMAIL
+                  <input
+                    required
+                    type="email"
+                    autoComplete="off"
+                    value={email}
+                    placeholder="sample@example.com"
+                    onChange={(e) =>
+                      setEmail(e.target.value)
+                    }
+                  />
+                </label>
+              </div>
+
+              <label className="ar3-acknowledgment">
+                <input
+                  type="checkbox"
+                  checked={accepted}
+                  onChange={(e) =>
+                    setAccepted(e.target.checked)
+                  }
+                />
+
+                <span>
+                  I understand this is a local
+                  portfolio simulation: no actual
+                  villa is booked, no email is sent
+                  and no payment is processed.
+                </span>
+              </label>
+
+              {error && (
+                <p className="ar3-error" role="alert">
+                  {error}
                 </p>
               )}
 
-              <p className="ys3-disclaimer">
-                {DEMO_NOTICES.booking}
+              <button
+                type="submit"
+                className="ar3-main-action"
+                disabled={!quote.ok || !accepted}
+              >
+                SAVE DEMONSTRATION RESERVATION
+                <ArrowUpRight size={19} />
+              </button>
+
+              <p className="ar3-disclosure">
+                <ShieldCheck size={16} />
+                {DEMO_NOTICES.booking}{" "}
+                {DEMO_NOTICES.payment}
               </p>
-            </div>
-          </aside>
+            </section>
+          </form>
         </div>
 
-        {confirmed && (
-          <section
-            className="ys3-success"
-            role="status"
-            aria-live="polite"
-          >
-            <CheckCircle2 size={39} />
-            <span className="ys-kicker">
-              DEMO RESERVATION SAVED
+        {/* STICKY RESERVATION TRAVEL DOCUMENT */}
+
+        <aside
+          className="ar3-itinerary"
+          id="ar3-step-4"
+          aria-label="Live itinerary and reservation total"
+        >
+          <div className="ar3-itinerary__image">
+            <img
+              src={stay?.images[0] || PHOTOS.hero}
+              alt={`Illustrative ${
+                stay?.name || "resort villa"
+              }`}
+            />
+
+            <span>
+              YOUR STAY / PERSONAL ITINERARY
             </span>
-            <h2 className="ys3-heading">
-              Your escape is <em>on the calendar.</em>
-            </h2>
-            <p>
-              Your reservation exists only in this browser's
-              prototype data. It has not been sent to a resort.
-            </p>
-
-            <div className="ys3-ref">
-              Reference: <strong>{confirmed.id}</strong>
-            </div>
-          </section>
-        )}
-
-        <section className="ys3-history">
-          <div className="ys3-section-heading">
-            <div>
-              <span className="ys-kicker">
-                YOUR BROWSER'S DEMO BOOKINGS
-              </span>
-              <h2 className="ys3-heading">
-                Reservation <em>history.</em>
-              </h2>
-            </div>
-            <span>{history.length} total</span>
           </div>
 
+          <div className="ar3-itinerary__content">
+            <div className="ar3-ticket-head">
+              <span>
+                THE TRAVEL DOCUMENT / NO. 03
+              </span>
+              <Waves size={24} />
+            </div>
+
+            <h2>
+              Your <em>elsewhere.</em>
+            </h2>
+
+            <h3>{stay?.name}</h3>
+
+            <div className="ar3-route">
+              <div>
+                <span>ARRIVE</span>
+                <strong>{prettyDay(checkIn)}</strong>
+              </div>
+
+              <span className="ar3-route__line">
+                <i />
+              </span>
+
+              <div>
+                <span>DEPART</span>
+                <strong>{prettyDay(checkOut)}</strong>
+              </div>
+            </div>
+
+            <div className="ar3-itinerary__facts">
+              <Readout
+                label="LANDSCAPE"
+                value={
+                  getZone(stay?.zoneId)?.label || "—"
+                }
+              />
+
+              <Readout
+                label="TRAVELERS"
+                value={`${actualGuests} GUEST${
+                  actualGuests === 1 ? "" : "S"
+                }`}
+              />
+
+              <Readout
+                label="EXTRAS"
+                value={`${addOnIds.length} SELECTED`}
+              />
+            </div>
+
+            {quote.ok ? (
+              <div className="ar3-itemized">
+                <Readout
+                  label={`${quote.nights} NIGHTS / VILLA`}
+                  value={formatPeso(
+                    quote.nightlySubtotal
+                  )}
+                />
+
+                {quote.extraGuestTotal > 0 && (
+                  <Readout
+                    label="ADDITIONAL GUESTS"
+                    value={formatPeso(
+                      quote.extraGuestTotal
+                    )}
+                  />
+                )}
+
+                {quote.addOnTotal > 0 && (
+                  <Readout
+                    label="PERSONAL TOUCHES"
+                    value={formatPeso(
+                      quote.addOnTotal
+                    )}
+                  />
+                )}
+
+                <div className="ar3-itinerary__total">
+                  <span>STANDARD DEMO TOTAL</span>
+                  <strong>
+                    {formatPeso(quote.total)}
+                  </strong>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="ar3-error"
+                role="status"
+              >
+                {quote.error}
+              </div>
+            )}
+
+            {contextOffer && quote.ok && (
+              <div className="ar3-preview">
+                <span>
+                  ILLUSTRATIVE OFFER /{" "}
+                  {contextOffer.code}
+                </span>
+
+                <Readout
+                  label="SAMPLE SAVING"
+                  value={`−${formatPeso(offer.saving)}`}
+                />
+
+                <Readout
+                  label="HYPOTHETICAL TOTAL"
+                  value={formatPeso(
+                    offer.hypotheticalTotal
+                  )}
+                />
+
+                <p>
+                  Not redeemable. The record is
+                  saved using the <b>standard total</b>{" "}
+                  shown above.
+                </p>
+              </div>
+            )}
+
+            <div className="ar3-ticket-stamp">
+              <TideCompass />
+              <span>
+                RESERVATION CONCEPT ONLY
+                {" / "}
+                NOT VALID FOR TRAVEL
+              </span>
+            </div>
+          </div>
+        </aside>
+      </section>
+
+      {/* DEMONSTRATION CONFIRMATION */}
+
+      {result && (
+        <section
+          className="ar3-success ar3-container"
+          ref={ready}
+          role="status"
+          aria-live="polite"
+        >
+          <CoastalContours pale />
+
+          <div>
+            <CheckCircle2 size={43} />
+
+            <span className="ar3-overline">
+              LOCAL DEMO RECORD CREATED
+            </span>
+
+            <h2>
+              A little journey, <em>imagined.</em>
+            </h2>
+
+            <p>
+              Reference <strong>{result.id}</strong>{" "}
+              is saved in this browser and visible in
+              the staff demo. No real reservation
+              was submitted.
+            </p>
+
+            <div className="ar3-success__actions">
+              <button
+                type="button"
+                onClick={copyReference}
+              >
+                <Copy size={16} />
+                {copyLabel}
+              </button>
+
+              <Link to="/staff/reservations">
+                OPEN STAFF RESERVATIONS
+                <ArrowUpRight size={18} />
+              </Link>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* LOCAL BROWSER RESERVATION LOG */}
+
+      <section className="ar3-log ar3-container">
+        <div className="ar3-log__heading">
+          <span className="ar3-overline">
+            04 / THE BROWSER'S PRIVATE LOG
+          </span>
+
+          <h2>
+            Previous <em>chapters.</em>
+          </h2>
+
+          <p>
+            Local demonstration reservations on
+            this browser, not real booking history.
+          </p>
+        </div>
+
+        <div className="ar3-log__entries">
           {history.length === 0 ? (
-            <div className="ys3-panel">
-              <p>No demo reservations saved yet.</p>
+            <div className="ar3-log__empty">
+              NO DEMONSTRATION RESERVATIONS YET /
+              BEGIN WITH YOUR FIRST STAY
             </div>
           ) : (
-            <div className="ys3-history-list">
-              {history.map((booking) => {
-                const item = ACCOMMODATIONS.find(
-                  (stay) => stay.id === booking.accommodationId
-                );
+            history.map((booking) => (
+              <article key={booking.id}>
+                <div>
+                  <span>{booking.id}</span>
 
-                return (
-                  <article
-                    className="ys3-history-card"
-                    key={booking.id}
+                  <h3>
+                    {accommodations.find(
+                      (s) =>
+                        s.id === booking.accommodationId
+                    )?.name || "Concept villa"}
+                  </h3>
+
+                  <p>
+                    {prettyDay(booking.checkIn)}
+                    {" — "}
+                    {prettyDay(booking.checkOut)}
+                    {" / "}
+                    {booking.guests} guests
+                  </p>
+                </div>
+
+                <div>
+                  <span
+                    className={`ar3-status ar3-status--${booking.status}`}
                   >
-                    <div>
-                      <span className="ys-kicker">
-                        {booking.id}
-                      </span>
+                    {booking.status.replaceAll("_", " ")}
+                  </span>
 
-                      <h3>{item?.name || "Resort stay"}</h3>
+                  <strong>
+                    {formatPeso(booking.total)}
+                  </strong>
 
-                      <p>
-                        {prettyDate(booking.checkIn)} —{" "}
-                        {prettyDate(booking.checkOut)}
-                      </p>
-
-                      <strong>{formatPeso(booking.total)}</strong>
-                    </div>
-
-                    <div className="ys3-history-actions">
-                      <span
-                        className={`ys3-status ys3-status--${booking.status}`}
-                      >
-                        {booking.status.replaceAll("_", " ")}
-                      </span>
-
-                      {booking.status === "confirmed" && (
-                        <button
-                          type="button"
-                          onClick={() => cancelBooking(booking.id)}
-                        >
-                          <Trash2 size={15} />
-                          Cancel demo
-                        </button>
-                      )}
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
+                  {booking.status === "confirmed" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        cancel(booking.id)
+                      }
+                    >
+                      <Trash2 size={14} />
+                      CANCEL DEMO
+                    </button>
+                  )}
+                </div>
+              </article>
+            ))
           )}
-        </section>
-      </div>
+        </div>
+      </section>
+
+      <section className="ar3-bottom-banner">
+        <span>
+          THE UNHURRIED ATLAS / NEXT CHAPTER
+        </span>
+
+        <h2>
+          It's the moments <em>in between.</em>
+        </h2>
+
+        <Link to="/packages">
+          EXPLORE CURATED ESCAPES
+          <ArrowRight size={18} />
+        </Link>
+      </section>
     </div>
   );
 }

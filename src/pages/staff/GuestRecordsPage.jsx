@@ -1,10 +1,15 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+
 import {
+  ArrowRight,
   ArrowUpRight,
+  CalendarDays,
   Download,
+  Heart,
   Mail,
   Search,
+  ShieldCheck,
   UserRound,
   Users,
   X,
@@ -13,378 +18,755 @@ import {
 import { formatPeso } from "../../data/config.js";
 import { useResort } from "../../context/ResortContext.jsx";
 
-function formatDate(value) {
-  if (!value) return "—";
+import "../../styles/stay-staff-finish.css";
 
-  const date = value.includes("T")
-    ? new Date(value)
-    : new Date(`${value}T12:00:00`);
+function formatted(date) {
+  if (!date) return "—";
 
-  return Number.isNaN(date.getTime())
+  const raw = date.includes("T")
+    ? date
+    : `${date}T12:00:00`;
+
+  const value = new Date(raw);
+
+  return Number.isNaN(value.getTime())
     ? "—"
-    : date.toLocaleDateString("en-PH", {
+    : value.toLocaleDateString("en-PH", {
         month: "short",
         day: "numeric",
         year: "numeric",
       });
 }
 
-function csvCell(value) {
+function csv(value) {
   let text = String(value ?? "");
-  if (/^\s*[=+\-@\t\r]/.test(text)) text = "'" + text;
+
+  if (/^\s*[=+\-@\t\r]/.test(text)) {
+    text = "'" + text;
+  }
+
   return `"${text.replaceAll('"', '""')}"`;
 }
 
-export default function GuestRecordsPage() {
-  const { reservations, accommodations } = useResort();
+function exportCsv(rows) {
+  const content =
+    "\uFEFF" +
+    rows
+      .map((row) =>
+        row.map(csv).join(",")
+      )
+      .join("\r\n");
 
-  const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
-  const [selectedEmail, setSelectedEmail] = useState(null);
+  const url = URL.createObjectURL(
+    new Blob([content], {
+      type: "text/csv;charset=utf-8",
+    })
+  );
+
+  const anchor = document.createElement("a");
+
+  anchor.href = url;
+  anchor.download =
+    "your-stay-demo-guest-folios.csv";
+
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+
+  window.setTimeout(
+    () => URL.revokeObjectURL(url),
+    1000
+  );
+}
+
+export default function GuestRecordsPage() {
+  const {
+    reservations,
+    accommodations,
+  } = useResort();
+
+  const [search, setSearch] =
+    useState("");
+
+  const [filter, setFilter] =
+    useState("all");
+
+  const [selectedKey, setSelectedKey] =
+    useState(null);
+
+  const [includeEmails, setIncludeEmails] =
+    useState(false);
+
+  const [feedback, setFeedback] =
+    useState("");
+
+  const villaName = (id) =>
+    accommodations.find(
+      (item) => item.id === id
+    )?.name || "Concept residence";
 
   const guests = useMemo(() => {
-    const grouped = new Map();
+    const map = new Map();
 
     for (const booking of reservations) {
-      const email = String(booking.email || "")
+      const email = String(
+        booking.email || ""
+      )
         .trim()
         .toLowerCase();
 
-      const key = email || `booking:${booking.id}`;
+      const key =
+        email ||
+        `reservation:${booking.id}`;
 
-      if (!grouped.has(key)) {
-        grouped.set(key, {
+      if (!map.has(key)) {
+        map.set(key, {
           key,
           email,
-          name: booking.guestName || "Demo Guest",
           bookings: [],
         });
       }
 
-      grouped.get(key).bookings.push(booking);
+      map.get(key).bookings.push(booking);
     }
 
-    return [...grouped.values()]
+    return [...map.values()]
       .map((guest) => {
-        const sorted = [...guest.bookings].sort(
-          (a, b) =>
-            String(b.createdAt || "").localeCompare(
-              String(a.createdAt || "")
-            )
+        const history = [
+          ...guest.bookings,
+        ].sort((a, b) =>
+          String(
+            b.createdAt || ""
+          ).localeCompare(
+            String(a.createdAt || "")
+          )
         );
 
-        const valid = sorted.filter(
-          (booking) => booking.status !== "cancelled"
+        const nonCancelled =
+          history.filter(
+            (booking) =>
+              booking.status !== "cancelled"
+          );
+
+        const active = history.filter(
+          (booking) =>
+            [
+              "confirmed",
+              "checked_in",
+            ].includes(booking.status)
         );
 
         return {
           ...guest,
-          name: sorted[0]?.guestName || guest.name,
-          bookings: sorted,
-          bookingCount: sorted.length,
-          activeCount: sorted.filter(
-            (b) =>
-              b.status === "confirmed" ||
-              b.status === "checked_in"
-          ).length,
-          stayCount: valid.length,
-          projectedValue: valid.reduce(
-            (sum, b) => sum + (Number(b.total) || 0),
-            0
-          ),
-          lastActivity: sorted[0]?.createdAt || "",
-          repeat: valid.length >= 2,
+          history,
+
+          name:
+            history[0]?.guestName ||
+            "Demo guest",
+
+          total: history.length,
+
+          nonCancelled:
+            nonCancelled.length,
+
+          active: active.length,
+
+          repeat:
+            nonCancelled.length >= 2,
+
+          bookedValue:
+            nonCancelled.reduce(
+              (total, booking) =>
+                total +
+                (Number(booking.total) || 0),
+              0
+            ),
+
+          lastActivity:
+            history[0]?.createdAt || "",
         };
       })
       .sort((a, b) =>
-        b.lastActivity.localeCompare(a.lastActivity)
+        b.lastActivity.localeCompare(
+          a.lastActivity
+        )
       );
   }, [reservations]);
 
-  const visible = guests.filter((guest) => {
-    const query = search.toLowerCase().trim();
+  const visible = useMemo(
+    () =>
+      guests.filter((guest) => {
+        if (
+          search.trim() &&
+          !`${guest.name} ${guest.email}`
+            .toLowerCase()
+            .includes(
+              search.trim().toLowerCase()
+            )
+        ) {
+          return false;
+        }
 
-    const matches =
-      !query ||
-      `${guest.name} ${guest.email}`
-        .toLowerCase()
-        .includes(query);
-
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "repeat" && guest.repeat) ||
-      (filter === "active" && guest.activeCount > 0);
-
-    return matches && matchesFilter;
-  });
-
-  const selected = guests.find(
-    (guest) => guest.key === selectedEmail
+        return (
+          filter === "all" ||
+          (filter === "repeat" &&
+            guest.repeat) ||
+          (filter === "active" &&
+            guest.active > 0)
+        );
+      }),
+    [guests, search, filter]
   );
 
-  function exportGuests() {
+  const selected =
+    guests.find(
+      (guest) =>
+        guest.key === selectedKey
+    ) || null;
+
+  const repeatCount =
+    guests.filter(
+      (guest) => guest.repeat
+    ).length;
+
+  const activeCount =
+    guests.filter(
+      (guest) => guest.active > 0
+    ).length;
+
+  function download() {
+    if (!visible.length) return;
+
     const rows = [
-      [
-        "Guest Name",
-        "Demo Email",
-        "All Bookings",
-        "Non-cancelled Bookings",
-        "Active Bookings",
-        "Projected Booking Value PHP",
-      ],
-      ...visible.map((guest) => [
-        guest.name,
-        guest.email,
-        guest.bookingCount,
-        guest.stayCount,
-        guest.activeCount,
-        guest.projectedValue,
-      ]),
+      includeEmails
+        ? [
+            "Name (unverified)",
+            "Email (unverified)",
+            "Booking records",
+            "Non-cancelled bookings",
+            "Active booking records",
+            "Booked demo value PHP",
+          ]
+        : [
+            "Name (unverified)",
+            "Booking records",
+            "Non-cancelled bookings",
+            "Active booking records",
+            "Booked demo value PHP",
+          ],
     ];
 
-    const csv = rows
-      .map((row) => row.map(csvCell).join(","))
-      .join("\r\n");
+    for (const guest of visible) {
+      rows.push(
+        includeEmails
+          ? [
+              guest.name,
+              guest.email,
+              guest.total,
+              guest.nonCancelled,
+              guest.active,
+              guest.bookedValue,
+            ]
+          : [
+              guest.name,
+              guest.total,
+              guest.nonCancelled,
+              guest.active,
+              guest.bookedValue,
+            ]
+      );
+    }
 
-    const url = URL.createObjectURL(
-      new Blob(["\uFEFF", csv], {
-        type: "text/csv;charset=utf-8",
-      })
+    exportCsv(rows);
+
+    setFeedback(
+      `Exported ${visible.length} fictional guest profile(s)${
+        includeEmails
+          ? " with contact fields"
+          : " without email addresses"
+      }.`
     );
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "your-stay-demo-guests.csv";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
-  const repeatGuests = guests.filter((g) => g.repeat).length;
-
   return (
-    <div className="ys5-page ys6-page">
-      <header className="ys5-page-heading">
+    <div className="op4-page op5-page op5-guests-page">
+      {/* GUEST RELATIONSHIP COVER */}
+
+      <section className="op5-guest-hero">
         <div>
-          <span className="ys5-eyebrow">GUEST RELATIONSHIPS</span>
+          <span className="op4-eyebrow">
+            OPERATIONS / CHAPTER 07 ·
+            GUEST RELATIONSHIPS
+          </span>
+
           <h1>
-            The people behind <em>the moments.</em>
+            The people{" "}
+            <em>behind the moments.</em>
           </h1>
+
           <p>
-            Review guest histories and repeat-booking patterns
-            within this browser's prototype.
+            An intimate index of demonstration
+            guests and repeat-booking patterns.
+            Profile cards are grouped from
+            sample emails—not verified
+            customer accounts.
           </p>
+
+          <Link to="/staff/reservations">
+            OPEN THE RESERVATION DESK
+            <ArrowUpRight size={17} />
+          </Link>
         </div>
 
-        <button
-          type="button"
-          className="ys5-button"
-          disabled={!visible.length}
-          onClick={exportGuests}
+        <div
+          className="op5-guest-hero-art"
+          aria-hidden="true"
         >
-          <Download size={17} />
-          Export guests
-        </button>
-      </header>
+          <span>Y/S</span>
+          <i />
 
-      <div className="ys5-stat-grid">
-        <article className="ys5-stat-card">
-          <div className="ys5-stat-card-top">
-            <span>Demo guest profiles</span>
-            <Users size={21} />
-          </div>
-          <strong>{guests.length}</strong>
-          <small>Grouped by entered email address</small>
-        </article>
+          <small>
+            THE GUEST ATLAS · VOL. 07
+          </small>
+        </div>
+      </section>
 
-        <article className="ys5-stat-card">
-          <div className="ys5-stat-card-top">
-            <span>Repeat booking profiles</span>
-            <UserRound size={21} />
-          </div>
-          <strong>{repeatGuests}</strong>
-          <small>At least two non-cancelled bookings</small>
-        </article>
+      {/* GUEST METRICS */}
 
-        <article className="ys5-stat-card">
-          <div className="ys5-stat-card-top">
-            <span>Active guest profiles</span>
-            <Mail size={21} />
-          </div>
+      <div className="op5-overview-grid op5-guest-stats">
+        <div>
+          <span>
+            01 / UNIQUE EMAIL GROUPS
+          </span>
+
           <strong>
-            {guests.filter((g) => g.activeCount > 0).length}
+            {guests.length
+              .toString()
+              .padStart(2, "0")}
           </strong>
-          <small>Have confirmed or checked-in bookings</small>
-        </article>
+
+          <small>
+            Browser-local sample profiles
+          </small>
+        </div>
+
+        <div>
+          <span>
+            02 / REPEAT-BOOKING PROFILES
+          </span>
+
+          <strong>
+            {repeatCount
+              .toString()
+              .padStart(2, "0")}
+          </strong>
+
+          <small>
+            Two or more non-cancelled bookings
+          </small>
+        </div>
+
+        <div>
+          <span>
+            03 / ACTIVE PROFILES
+          </span>
+
+          <strong>
+            {activeCount
+              .toString()
+              .padStart(2, "0")}
+          </strong>
+
+          <small>
+            At least one confirmed or
+            checked-in booking
+          </small>
+        </div>
+
+        <div>
+          <span>
+            04 / RESERVATION RECORDS
+          </span>
+
+          <strong>
+            {reservations.length
+              .toString()
+              .padStart(2, "0")}
+          </strong>
+
+          <small>
+            Not actual resort customers
+          </small>
+        </div>
       </div>
 
-      <div className="ys6-guests-layout">
-        <section className="ys5-panel">
-          <div className="ys5-toolbar">
-            <div className="ys5-search">
-              <Search size={17} />
-              <input
-                type="search"
-                aria-label="Search guests"
-                placeholder="Search name or email..."
-                value={search}
-                onChange={(event) =>
-                  setSearch(event.target.value)
-                }
-              />
+      <div className="op5-workspace-grid op5-guest-layout">
+        {/* GUEST DIRECTORY */}
+
+        <section className="op4-panel op5-guest-directory">
+          <div className="op4-panel-head">
+            <div>
+              <span className="op4-eyebrow">
+                01 / THE PEOPLE INDEX
+              </span>
+
+              <h2>Names in the atlas.</h2>
             </div>
 
-            <select
-              className="ys6-select"
-              value={filter}
-              aria-label="Guest type filter"
-              onChange={(event) => setFilter(event.target.value)}
-            >
-              <option value="all">All guests</option>
-              <option value="repeat">Repeat bookings</option>
-              <option value="active">With active bookings</option>
-            </select>
+            <span className="op4-outline-mark">
+              {visible.length} PROFILES
+            </span>
           </div>
 
-          <div className="ys6-guest-list">
-            {visible.length === 0 ? (
-              <div className="ys5-empty">
-                <Users size={27} />
-                <p>No guest profiles found.</p>
-              </div>
-            ) : (
-              visible.map((guest) => (
+          <div className="op5-search-row">
+            <label className="op5-search">
+              <Search size={18} />
+
+              <input
+                type="search"
+                placeholder="Search sample name or email"
+                value={search}
+                aria-label="Search guest profiles"
+                onChange={(e) =>
+                  setSearch(e.target.value)
+                }
+              />
+            </label>
+
+            <label className="op5-mini-select">
+              <Users size={16} />
+
+              <select
+                aria-label="Guest grouping filter"
+                value={filter}
+                onChange={(e) =>
+                  setFilter(e.target.value)
+                }
+              >
+                <option value="all">
+                  All profiles
+                </option>
+
+                <option value="repeat">
+                  Repeat-booking
+                </option>
+
+                <option value="active">
+                  Active booking
+                </option>
+              </select>
+            </label>
+          </div>
+
+          <div className="op5-guest-list">
+            {visible.length ? (
+              visible.map((guest, index) => (
                 <button
-                  key={guest.key}
                   type="button"
-                  className={`ys6-guest-row ${
-                    selectedEmail === guest.key
+                  key={guest.key}
+                  className={`op5-guest-choice ${
+                    selectedKey === guest.key
                       ? "is-selected"
                       : ""
                   }`}
-                  onClick={() => setSelectedEmail(guest.key)}
+                  aria-pressed={
+                    selectedKey === guest.key
+                  }
+                  onClick={() => {
+                    setSelectedKey(
+                      guest.key
+                    );
+
+                    setFeedback("");
+                  }}
                 >
-                  <span className="ys6-avatar">
-                    {guest.name.charAt(0).toUpperCase()}
+                  <span className="op5-guest-avatar">
+                    {guest.name
+                      .trim()
+                      .slice(0, 1)
+                      .toUpperCase() || "?"}
                   </span>
 
-                  <span className="ys6-guest-row-info">
-                    <strong>{guest.name}</strong>
-                    <small>{guest.email || "No email"}</small>
+                  <span className="op5-guest-identity">
                     <small>
-                      {guest.bookingCount} booking(s) ·{" "}
-                      {guest.repeat ? "Repeat guest" : "New guest"}
+                      FOLIO /{" "}
+                      {String(
+                        index + 1
+                      ).padStart(2, "0")}
                     </small>
+
+                    <strong>
+                      {guest.name}
+                    </strong>
+
+                    <span>
+                      {guest.total} booking
+                      record(s) ·{" "}
+                      {guest.repeat
+                        ? "Repeat-booking"
+                        : "Standard"}
+                    </span>
                   </span>
 
-                  <ArrowUpRight size={19} />
+                  <ArrowUpRight size={18} />
                 </button>
               ))
+            ) : (
+              <div className="op5-no-data">
+                <UserRound size={27} />
+
+                <h3>No profiles found.</h3>
+
+                <p>
+                  Guest records appear after
+                  you create demo reservations.
+                </p>
+              </div>
             )}
           </div>
+
+          {/* PRIVACY-AWARE CSV EXPORT */}
+
+          <div className="op5-export-zone">
+            <span className="op4-eyebrow">
+              PRIVATE DATA EXPORT
+            </span>
+
+            <label>
+              <input
+                type="checkbox"
+                checked={includeEmails}
+                onChange={(e) =>
+                  setIncludeEmails(
+                    e.target.checked
+                  )
+                }
+              />
+
+              Include entered email
+              addresses in CSV
+            </label>
+
+            <button
+              type="button"
+              className="op5-export-full"
+              disabled={!visible.length}
+              onClick={download}
+            >
+              <Download size={16} />
+              EXPORT VISIBLE PROFILES
+              <ArrowUpRight size={16} />
+            </button>
+
+            <small>
+              Contact fields are excluded by
+              default. Spreadsheet-formula
+              strings are escaped during
+              CSV export.
+            </small>
+          </div>
+
+          {feedback && (
+            <p
+              role="status"
+              className="op4-feedback"
+            >
+              {feedback}
+            </p>
+          )}
         </section>
 
-        <aside className="ys5-panel ys6-guest-detail">
+        {/* SELECTED GUEST FOLIO */}
+
+        <aside
+          className="op4-panel op5-guest-inspector"
+          aria-label="Guest folio"
+        >
           {!selected ? (
-            <div className="ys5-empty">
-              <UserRound size={29} />
+            <div className="op5-inspector-empty">
+              <Heart
+                size={42}
+                strokeWidth={1}
+              />
+
+              <span className="op4-eyebrow">
+                02 / AN OPEN FOLIO
+              </span>
+
+              <h2>
+                Every guest has{" "}
+                <em>a chapter.</em>
+              </h2>
+
               <p>
-                Select a guest profile to view its demo history.
+                Choose a sample profile to see
+                its reservation history and
+                booking patterns.
               </p>
             </div>
           ) : (
             <>
-              <div className="ys6-detail-heading">
-                <div>
-                  <span className="ys5-eyebrow">GUEST PROFILE</span>
-                  <h2>{selected.name}</h2>
-                </div>
+              <div className="op5-inspector-top">
+                <span className="op4-eyebrow">
+                  02 / PROFILE JOURNAL
+                </span>
+
                 <button
                   type="button"
-                  aria-label="Close guest profile"
-                  onClick={() => setSelectedEmail(null)}
+                  aria-label="Close guest folio"
+                  onClick={() =>
+                    setSelectedKey(null)
+                  }
                 >
-                  <X size={19} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <p className="ys6-muted">
-                {selected.email || "No email recorded"}
-              </p>
+              <div className="op5-guest-profile-heading">
+                <span className="op5-guest-profile-monogram">
+                  {selected.name
+                    .slice(0, 1)
+                    .toUpperCase()}
+                </span>
 
-              <div className="ys6-guest-metrics">
                 <div>
-                  <span>Bookings</span>
-                  <strong>{selected.bookingCount}</strong>
+                  <span>
+                    UNVERIFIED DEMO PROFILE
+                  </span>
+
+                  <h2>{selected.name}</h2>
+
+                  <p>
+                    <Mail size={14} />
+
+                    {selected.email ||
+                      "No email recorded"}
+                  </p>
                 </div>
+              </div>
+
+              <div className="op5-profile-metrics">
                 <div>
-                  <span>Non-cancelled</span>
-                  <strong>{selected.stayCount}</strong>
-                </div>
-                <div>
-                  <span>Projected value</span>
+                  <span>RECORDS</span>
                   <strong>
-                    {formatPeso(selected.projectedValue)}
+                    {selected.total}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>ACTIVE</span>
+                  <strong>
+                    {selected.active}
+                  </strong>
+                </div>
+
+                <div>
+                  <span>
+                    BOOKED DEMO VALUE
+                  </span>
+
+                  <strong className="op5-compact-money">
+                    {formatPeso(
+                      selected.bookedValue
+                    )}
                   </strong>
                 </div>
               </div>
 
-              <h3 className="ys6-subheading">
-                Reservation history
-              </h3>
+              <div className="op5-history-heading">
+                <span className="op4-eyebrow">
+                  03 / THE STAY JOURNAL
+                </span>
 
-              <div className="ys6-guest-history">
-                {selected.bookings.map((booking) => {
-                  const stay = accommodations.find(
-                    (item) =>
-                      item.id === booking.accommodationId
-                  );
+                <h3>
+                  Reservations in time.
+                </h3>
+              </div>
 
-                  return (
-                    <article key={booking.id}>
-                      <span className="ys5-eyebrow">
-                        {booking.id}
+              <div className="op5-guest-history">
+                {selected.history.map(
+                  (booking, index) => (
+                    <article
+                      key={booking.id}
+                      className="op5-history-item"
+                    >
+                      <span className="op5-history-axis">
+                        {String(
+                          index + 1
+                        ).padStart(2, "0")}
                       </span>
-                      <strong>
-                        {stay?.name || "Accommodation"}
-                      </strong>
-                      <span>
-                        {formatDate(booking.checkIn)} –{" "}
-                        {formatDate(booking.checkOut)}
-                      </span>
-                      <div className="ys6-history-bottom">
-                        <span
-                          className={`ys5-status ys5-status-${booking.status}`}
-                        >
-                          {booking.status.replaceAll("_", " ")}
-                        </span>
-                        <strong>{formatPeso(booking.total)}</strong>
+
+                      <div>
+                        <small>
+                          {booking.id}
+                        </small>
+
+                        <strong>
+                          {villaName(
+                            booking.accommodationId
+                          )}
+                        </strong>
+
+                        <p>
+                          <CalendarDays size={13} />
+
+                          {formatted(
+                            booking.checkIn
+                          )}
+                          {" — "}
+                          {formatted(
+                            booking.checkOut
+                          )}
+                        </p>
+
+                        <div className="op5-history-bottom">
+                          <span
+                            className={`op5-stamp op5-stamp--${booking.status}`}
+                          >
+                            {booking.status
+                              .replaceAll(
+                                "_",
+                                " "
+                              )
+                              .toUpperCase()}
+                          </span>
+
+                          <b>
+                            {formatPeso(
+                              booking.total
+                            )}
+                          </b>
+                        </div>
                       </div>
                     </article>
-                  );
-                })}
+                  )
+                )}
               </div>
 
               <Link
+                className="op4-text-action"
                 to="/staff/reservations"
-                className="ys5-text-link"
               >
-                Open reservation desk
-                <ArrowUpRight size={16} />
+                MANAGE RESERVATION STATUSES
+                <ArrowRight size={16} />
               </Link>
             </>
           )}
         </aside>
       </div>
 
-      <p className="ys5-legal-note">
-        Guest identities are based only on typed names and emails.
-        These records are not verified customer accounts. No staff
-        authentication or server-side privacy controls exist in
-        this prototype. Use fictional test information only.
-      </p>
+      <div className="op5-privacy-note">
+        <ShieldCheck size={17} />
+
+        <span>
+          Guest identities and emails are
+          unverified values entered by a
+          browser visitor. No login,
+          server storage, cross-device sync
+          or real customer relationship system
+          exists. Use fictional details only.
+        </span>
+      </div>
     </div>
   );
 }

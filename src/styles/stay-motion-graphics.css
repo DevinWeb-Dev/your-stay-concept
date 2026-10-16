@@ -1,0 +1,455 @@
+/* =====================================================
+   YOUR STAY. — COASTAL MOTION GRAPHICS
+   Architectural Rebuild / Motion System 02
+
+   Built for hospitality, not arcade-like effects.
+   No canvas loop, video downloads,
+   or additional dependencies.
+===================================================== */
+
+/* ============================================
+   01 / ANIMATED COASTAL CONTOUR LINES
+============================================ */
+
+.ya-site .ya-contours {
+  pointer-events: none;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.ya-site .ya-contour-line {
+  stroke-dasharray: 2 9 24 15;
+  stroke-linecap: round;
+
+  animation:
+    ya-coast-drift
+    38s linear infinite;
+
+  animation-delay:
+    calc(var(--line-index, 0) * -3.7s);
+}
+
+@keyframes ya-coast-drift {
+  to {
+    stroke-dashoffset: -450;
+  }
+}
+
+.ya-site .ya-tidal-markers {
+  opacity: .47;
+
+  stroke-width: 1px;
+  stroke-dasharray: 3 9;
+
+  transform-origin: center;
+
+  animation:
+    ya-tidal-float
+    16s ease-in-out infinite alternate;
+}
+
+.ya-site .ya-tidal-point {
+  fill: currentColor;
+  stroke: none;
+  opacity: .8;
+
+  transform-box: fill-box;
+  transform-origin: center;
+
+  animation:
+    ya-tidal-pulse
+    5s ease-in-out infinite;
+}
+
+@keyframes ya-tidal-float {
+  from {
+    transform: translate3d(
+      -8px,
+      6px,
+      0
+    );
+
+    opacity: .28;
+  }
+
+  to {
+    transform: translate3d(
+      12px,
+      -9px,
+      0
+    );
+
+    opacity: .55;
+  }
+}
+
+@keyframes ya-tidal-pulse {
+  50% {
+    opacity: .35;
+    transform: scale(1.55);
+  }
+}
+
+/* ============================================
+   02 / ARCHITECTURAL SURVEY COMPASS
+============================================ */
+
+.ya-site .ya-compass {
+  position: relative;
+  isolation: isolate;
+}
+
+.ya-site .ya-compass-orbit {
+  transform-box: view-box;
+  transform-origin: 120px 120px;
+
+  animation:
+    ya-dial-orbit
+    80s linear infinite;
+}
+
+.ya-site .ya-compass .ya-compass-outer,
+.ya-site .ya-compass .ya-compass-mid,
+.ya-site .ya-compass .ya-compass-inner,
+.ya-site .ya-compass .ya-compass-tick {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: .75px;
+}
+
+.ya-site .ya-compass .ya-compass-mid {
+  stroke-dasharray: 1 6;
+  animation: none;
+}
+
+.ya-site .ya-compass .ya-compass-tick {
+  stroke-width: .95px;
+}
+
+.ya-site .ya-compass .ya-compass-needle {
+  fill: currentColor;
+  fill-opacity: .23;
+
+  stroke: currentColor;
+  stroke-width: .8px;
+
+  animation: none;
+}
+
+.ya-site .ya-compass .ya-compass-stem {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: .8px;
+}
+
+.ya-site .ya-compass-needle-group {
+  transform-box: view-box;
+  transform-origin: 120px 120px;
+
+  animation:
+    ya-needle-tide
+    11s ease-in-out infinite alternate;
+}
+
+.ya-site .ya-compass .ya-compass-center {
+  fill: currentColor;
+  stroke: none;
+}
+
+@keyframes ya-dial-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ya-needle-tide {
+  from {
+    transform: rotate(-4deg);
+  }
+
+  to {
+    transform: rotate(4deg);
+  }
+}
+
+/* ============================================
+   03 / MOVING SUNLIGHT ACROSS PHOTOGRAPHY
+============================================ */
+
+.ya-site .ya-hero-right::before,
+.ya-site .ya-architecture-photo::before,
+.ya-site .ya-residence-stage::before {
+  content: "";
+
+  position: absolute;
+  inset: -35%;
+  z-index: 2;
+
+  background:
+    linear-gradient(
+      105deg,
+      transparent 38%,
+      rgba(255, 246, 211, .045) 45%,
+      rgba(255, 255, 255, .15) 49%,
+      rgba(255, 246, 211, .045) 54%,
+      transparent 62%
+    );
+
+  pointer-events: none;
+
+  transform:
+    translate3d(-75%, 0, 0)
+    rotate(-5deg);
+
+  animation:
+    ya-light-sweep
+    19s ease-in-out infinite;
+}
+
+.ya-site .ya-architecture-photo::before {
+  animation-delay: -7s;
+}
+
+.ya-site .ya-residence-stage::before {
+  animation-delay: -12s;
+}
+
+@keyframes ya-light-sweep {
+  0%,
+  22% {
+    transform:
+      translate3d(-75%, 0, 0)
+      rotate(-5deg);
+  }
+
+  64%,
+  100% {
+    transform:
+      translate3d(75%, 0, 0)
+      rotate(-5deg);
+  }
+}
+
+/* ============================================
+   04 / WATER-INSPIRED AMBIENT BACKGROUND
+============================================ */
+
+.ya-site .ya-intention::after,
+.ya-site .ya-operator::after {
+  content: "";
+
+  position: absolute;
+  z-index: -1;
+
+  width: min(65vw, 850px);
+  aspect-ratio: 1;
+
+  top: -45%;
+  right: -18%;
+
+  border-radius: 50%;
+
+  background:
+    radial-gradient(
+      circle,
+      rgba(124, 166, 139, .18) 0%,
+      rgba(124, 166, 139, .07) 35%,
+      transparent 68%
+    );
+
+  filter: blur(28px);
+  pointer-events: none;
+
+  animation:
+    ya-water-breathe
+    18s ease-in-out infinite alternate;
+}
+
+.ya-site .ya-operator::after {
+  background:
+    radial-gradient(
+      circle,
+      rgba(225, 225, 155, .13) 0%,
+      rgba(225, 225, 155, .04) 41%,
+      transparent 68%
+    );
+
+  animation-delay: -8s;
+}
+
+@keyframes ya-water-breathe {
+  from {
+    opacity: .45;
+
+    transform:
+      translate3d(-15px, -8px, 0)
+      scale(.94);
+  }
+
+  to {
+    opacity: .8;
+
+    transform:
+      translate3d(18px, 12px, 0)
+      scale(1.08);
+  }
+}
+
+/* ============================================
+   05 / ELEGANT SCROLL REVEAL
+============================================ */
+
+.ya-site .ya-reveal {
+  will-change: auto;
+
+  transition-duration:
+    1.08s,
+    1.22s;
+
+  transition-timing-function:
+    cubic-bezier(.22, 1, .36, 1);
+}
+
+.ya-site .ya-reveal.is-visible {
+  transform: translate3d(0, 0, 0);
+  opacity: 1;
+}
+
+/* ============================================
+   06 / CINEMATIC IMAGE INTERACTIONS
+============================================ */
+
+.ya-site .ya-residence-photo img,
+.ya-site .ya-destination > img,
+.ya-site .ya-experience-media img {
+  transition:
+    transform 1.2s
+      cubic-bezier(.22, 1, .36, 1),
+    filter 1.2s ease;
+}
+
+.ya-site .ya-residence-photo:hover img,
+.ya-site .ya-destination:hover > img,
+.ya-site .ya-experience-card:hover img {
+  transform: scale(1.045);
+  filter: saturate(1.06);
+}
+
+.ya-site .ya-hero-photo {
+  transition:
+    opacity 1.5s ease,
+    transform 12s
+      cubic-bezier(.2, .65, .2, 1);
+}
+
+.ya-site .ya-residence-stage {
+  animation-duration: .95s;
+}
+
+/* ============================================
+   07 / REFINED NAVIGATION MICROINTERACTIONS
+============================================ */
+
+.ya-site .ya-nav-link::after {
+  transition:
+    right .4s
+    cubic-bezier(.22, 1, .36, 1);
+}
+
+.ya-site .ya-hero-primary,
+.ya-site .ya-operator > a,
+.ya-site .ya-finale-content a,
+.ya-site .ya-demo-float {
+  transition:
+    transform .45s
+      cubic-bezier(.22, 1, .36, 1),
+    background .3s ease,
+    box-shadow .45s ease;
+}
+
+.ya-site .ya-hero-primary:hover,
+.ya-site .ya-operator > a:hover,
+.ya-site .ya-finale-content a:hover {
+  transform: translateY(-3px);
+
+  box-shadow:
+    0 15px 35px rgba(16, 35, 33, .2);
+}
+
+/* ============================================
+   08 / SCROLL PROGRESS COLOR
+============================================ */
+
+.ya-site .ya-page-progress span {
+  background:
+    linear-gradient(
+      90deg,
+      #9b694f,
+      #dfdd9a,
+      #9b694f
+    );
+}
+
+/* ============================================
+   09 / PERFORMANCE ON PHONES AND TABLETS
+============================================ */
+
+@media (max-width: 760px) {
+  .ya-site .ya-hero-right::before,
+  .ya-site .ya-architecture-photo::before,
+  .ya-site .ya-residence-stage::before {
+    animation-duration: 27s;
+    opacity: .65;
+  }
+
+  .ya-site .ya-intention::after,
+  .ya-site .ya-operator::after {
+    filter: blur(13px);
+    opacity: .45;
+  }
+
+  .ya-site .ya-tidal-markers {
+    opacity: .26;
+  }
+
+  .ya-site .ya-contour-line {
+    animation-duration: 60s;
+  }
+}
+
+/* ============================================
+   10 / REDUCED MOTION & ACCESSIBILITY
+============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .ya-site .ya-reveal,
+  .ya-site .ya-reveal.is-visible {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+
+  .ya-site .ya-hero-right::before,
+  .ya-site .ya-architecture-photo::before,
+  .ya-site .ya-residence-stage::before,
+  .ya-site .ya-intention::after,
+  .ya-site .ya-operator::after {
+    animation: none !important;
+    opacity: 0 !important;
+  }
+
+  .ya-site .ya-contour-line,
+  .ya-site .ya-tidal-markers,
+  .ya-site .ya-tidal-point,
+  .ya-site .ya-compass-orbit,
+  .ya-site .ya-compass-needle-group {
+    animation: none !important;
+  }
+
+  .ya-site .ya-hero-photo,
+  .ya-site .ya-residence-photo img,
+  .ya-site .ya-destination > img,
+  .ya-site .ya-experience-media img {
+    transition: none !important;
+  }
+}

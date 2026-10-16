@@ -1,4 +1,9 @@
-import { useEffect, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
 import {
   Link,
   NavLink,
@@ -12,206 +17,410 @@ import {
   BarChart3,
   Building2,
   CalendarDays,
-  ClipboardList,
+  ClipboardCheck,
+  Compass,
   LayoutDashboard,
   Menu,
   Settings2,
-  Sparkles,
   Users,
   Waves,
   X,
 } from "lucide-react";
 
-import { useResort } from "../context/ResortContext.jsx";
+import {
+  useResort,
+} from "../context/ResortContext.jsx";
+
+import "../styles/stay-operations-architectural.css";
 
 const NAV = [
   {
-    label: "Overview",
-    path: "/staff",
+    to: "/staff",
+    label: "Command center",
     icon: LayoutDashboard,
     end: true,
   },
   {
-    label: "Reservations",
-    path: "/staff/reservations",
+    to: "/staff/reservations",
+    label: "Reservation desk",
+    icon: ClipboardCheck,
+  },
+  {
+    to: "/staff/calendar",
+    label: "Booking calendar",
     icon: CalendarDays,
   },
   {
-    label: "Villa Management",
-    path: "/staff/villas",
+    to: "/staff/villas",
+    label: "Villa operations",
     icon: Building2,
   },
   {
+    to: "/staff/housekeeping",
     label: "Housekeeping",
-    path: "/staff/housekeeping",
-    icon: ClipboardList,
+    icon: Waves,
   },
   {
-    label: "Reports",
-    path: "/staff/reports",
+    to: "/staff/reports",
+    label: "Intelligence",
     icon: BarChart3,
   },
   {
-    label: "Guest Records",
-    path: "/staff/guests",
+    to: "/staff/guests",
+    label: "Guest records",
     icon: Users,
   },
   {
-    label: "Booking Calendar",
-    path: "/staff/calendar",
-    icon: CalendarDays,
-  },
-  {
+    to: "/staff/settings",
     label: "Settings",
-    path: "/staff/settings",
     icon: Settings2,
   },
 ];
 
 export default function StaffLayout() {
-  const { stats, accommodations } = useResort();
-  const location = useLocation();
-  const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
+
+  const {
+    accommodations,
+    stats,
+  } = useResort();
+
+  const [open, setOpen] =
+    useState(false);
+
+  const [mobile, setMobile] =
+    useState(
+      () =>
+        typeof window !== "undefined" &&
+        window.matchMedia?.(
+          "(max-width: 1120px)"
+        ).matches
+    );
+
+  const sidebar = useRef(null);
+  const menuButton = useRef(null);
+
+  const current = NAV.find((item) =>
+    item.end
+      ? pathname === item.to
+      : pathname === item.to ||
+        pathname.startsWith(
+          `${item.to}/`
+        )
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(
+      "(max-width: 1120px)"
+    );
+
+    const sync = () =>
+      setMobile(media.matches);
+
+    sync();
+
+    media.addEventListener(
+      "change",
+      sync
+    );
+
+    return () =>
+      media.removeEventListener(
+        "change",
+        sync
+      );
+  }, []);
 
   useEffect(() => {
     setOpen(false);
     window.scrollTo(0, 0);
-  }, [location.pathname]);
+  }, [pathname]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !mobile) return;
 
-    function onEscape(event) {
-      if (event.key === "Escape") setOpen(false);
+    const previous =
+      document.activeElement;
+
+    const overflow =
+      document.body.style.overflow;
+
+    document.body.style.overflow =
+      "hidden";
+
+    sidebar.current
+      ?.querySelector("a[href]")
+      ?.focus();
+
+    function keydown(event) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        menuButton.current?.focus();
+        return;
+      }
+
+      if (
+        event.key !== "Tab" ||
+        !sidebar.current
+      ) {
+        return;
+      }
+
+      const items = [
+        ...sidebar.current.querySelectorAll(
+          'a[href],button:not([disabled])'
+        ),
+      ].filter(
+        (node) =>
+          node.getClientRects().length
+      );
+
+      if (!items.length) return;
+
+      if (
+        event.shiftKey &&
+        document.activeElement ===
+          items[0]
+      ) {
+        event.preventDefault();
+        items.at(-1).focus();
+      }
+
+      if (
+        !event.shiftKey &&
+        document.activeElement ===
+          items.at(-1)
+      ) {
+        event.preventDefault();
+        items[0].focus();
+      }
     }
 
-    document.addEventListener("keydown", onEscape);
+    document.addEventListener(
+      "keydown",
+      keydown
+    );
 
     return () => {
-      document.removeEventListener("keydown", onEscape);
+      document.body.style.overflow =
+        overflow;
+
+      document.removeEventListener(
+        "keydown",
+        keydown
+      );
+
+      if (previous?.isConnected) {
+        previous.focus();
+      }
     };
-  }, [open]);
+  }, [open, mobile]);
 
   return (
-    <div className="ys5-admin">
-      <aside
-        className={`ys5-sidebar ${open ? "is-open" : ""}`}
-        aria-label="Resort management navigation"
-      >
-        <Link to="/" className="ys5-sidebar-brand">
-          <Waves size={26} strokeWidth={1.3} />
-          <div>
-            <strong>YOUR STAY.</strong>
-            <small>RESORT OPERATIONS</small>
-          </div>
-        </Link>
-
-        <div className="ys5-sidebar-label">
-          MANAGEMENT CONSOLE
-        </div>
-
-        <nav className="ys5-sidebar-nav">
-          {NAV.map((item) => {
-            const Icon = item.icon;
-
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={Boolean(item.end)}
-                onClick={() => setOpen(false)}
-                className={({ isActive }) =>
-                  `ys5-sidebar-link ${
-                    isActive ? "is-active" : ""
-                  }`
-                }
-              >
-                <Icon size={19} strokeWidth={1.6} />
-                <span>{item.label}</span>
-                <ArrowUpRight size={15} />
-              </NavLink>
-            );
-          })}
-        </nav>
-
-        <div className="ys5-sidebar-spacer" />
-
-        <div className="ys5-sidebar-note">
-          <Sparkles size={22} strokeWidth={1.4} />
-          <strong>A calmer way to manage.</strong>
-          <p>
-            A demonstration workspace for resort operations,
-            not a live property-management system.
-          </p>
-        </div>
-
-        <Link
-          to="/"
-          onClick={() => setOpen(false)}
-          className="ys5-sidebar-back"
-        >
-          <ArrowLeft size={17} />
-          Back to website
-        </Link>
-      </aside>
-
-      {open && (
+    <div className="ys5-admin op4-shell">
+      {open && mobile && (
         <button
-          className="ys5-mobile-scrim"
           type="button"
-          onClick={() => setOpen(false)}
-          aria-label="Close navigation"
+          className="op4-scrim"
+          aria-label="Close staff navigation"
+          onClick={() =>
+            setOpen(false)
+          }
         />
       )}
 
-      <div className="ys5-admin-main">
-        <header className="ys5-topbar">
-          <div className="ys5-topbar-left">
+      <aside
+        ref={sidebar}
+        id="op4-sidebar"
+        className={`op4-sidebar ${
+          open ? "is-open" : ""
+        }`}
+        aria-label="Staff workspace navigation"
+        inert={mobile && !open}
+      >
+        <Link
+          className="op4-brand"
+          to="/staff"
+          onClick={() =>
+            setOpen(false)
+          }
+        >
+          <span className="op4-brand-symbol">
+            <Waves
+              size={25}
+              strokeWidth={1.25}
+            />
+          </span>
+
+          <span>
+            <strong>
+              YOUR STAY.
+            </strong>
+
+            <small>
+              HOSPITALITY ATELIER
+            </small>
+          </span>
+        </Link>
+
+        <div className="op4-side-edition">
+          <span>
+            OPERATIONS / NO. 01
+          </span>
+
+          <Compass size={18} />
+        </div>
+
+        <nav
+          className="op4-nav"
+          aria-label="Staff sections"
+        >
+          {NAV.map(
+            (
+              {
+                to,
+                label,
+                icon: Icon,
+                end,
+              },
+              index
+            ) => (
+              <NavLink
+                key={to}
+                end={end}
+                to={to}
+                onClick={() =>
+                  setOpen(false)
+                }
+                className={({
+                  isActive,
+                }) =>
+                  `op4-nav-link ${
+                    isActive
+                      ? "is-active"
+                      : ""
+                  }`
+                }
+              >
+                <small>
+                  {String(
+                    index + 1
+                  ).padStart(2, "0")}
+                </small>
+
+                <Icon
+                  size={18}
+                  strokeWidth={1.5}
+                />
+
+                <span>{label}</span>
+
+                <ArrowUpRight
+                  size={15}
+                  className="op4-nav-arrow"
+                />
+              </NavLink>
+            )
+          )}
+        </nav>
+
+        <div className="op4-side-bottom">
+          <div className="op4-side-note">
+            <span>
+              THE QUIET SIDE OF OPERATIONS
+            </span>
+
+            <p>
+              Every reservation is a story.
+              Every detail deserves attention.
+            </p>
+
+            <small>
+              FRONTEND DEMO / LOCAL DATA ONLY
+            </small>
+          </div>
+
+          <Link
+            className="op4-side-return"
+            to="/"
+          >
+            <ArrowLeft size={17} />
+            RETURN TO RESORT SITE
+            <ArrowUpRight size={16} />
+          </Link>
+        </div>
+      </aside>
+
+      <div className="op4-main">
+        <header className="op4-topbar">
+          <div className="op4-top-left">
             <button
+              ref={menuButton}
+              className="op4-menu"
               type="button"
-              className="ys5-menu-button"
-              onClick={() => setOpen((current) => !current)}
-              aria-label={open ? "Close menu" : "Open menu"}
               aria-expanded={open}
+              aria-controls="op4-sidebar"
+              aria-label={
+                open
+                  ? "Close staff navigation"
+                  : "Open staff navigation"
+              }
+              onClick={() =>
+                setOpen((value) => !value)
+              }
             >
-              {open ? <X size={23} /> : <Menu size={23} />}
+              {open ? (
+                <X size={21} />
+              ) : (
+                <Menu size={21} />
+              )}
             </button>
 
             <div>
-              <span className="ys5-topbar-kicker">
-                RESORT OPERATIONS
+              <span>
+                THE UNHURRIED ATLAS / OPERATIONS
               </span>
-              <strong>YOUR STAY CONSOLE</strong>
+
+              <strong>
+                {current?.label ||
+                  "Resort operations"}
+              </strong>
             </div>
           </div>
 
-          <div className="ys5-topbar-right">
-            <span className="ys5-topbar-stat">
-              <Building2 size={16} />
-              {accommodations.length} stays
+          <div className="op4-top-right">
+            <span>
+              {accommodations.length}
+              {" "}RESIDENCES
             </span>
 
-            <span className="ys5-topbar-stat">
-              <CalendarDays size={16} />
-              {stats.activeReservations} active
+            <span>
+              {stats.activeReservations}
+              {" "}ACTIVE RECORDS
             </span>
 
-            <span className="ys5-demo-pill">
-              DEMO MODE
-            </span>
+            <b>
+              LOCAL DEMO
+            </b>
           </div>
         </header>
 
-        <main className="ys5-workspace">
+        <main
+          className="op4-content"
+          id="staff-main"
+        >
           <Outlet />
         </main>
 
-        <footer className="ys5-admin-footer">
+        <footer className="op4-footer">
           <span>
-            © {new Date().getFullYear()} YOUR STAY.
+            YOUR STAY. / CONCEPT
+            OPERATIONS STUDIO
           </span>
+
           <span>
-            Website Concept Made by: Web Developer Devin Planas
+            Website Concept Made by:
+            Web Developer Devin Planas
           </span>
         </footer>
       </div>

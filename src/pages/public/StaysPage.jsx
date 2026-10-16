@@ -1,249 +1,1234 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useSearchParams } from "react-router-dom";
+
 import {
-  ArrowLeft, ArrowRight, ArrowUpRight, BedDouble, CalendarDays,
-  Check, CheckCircle2, ChevronDown, Heart, Search, SlidersHorizontal,
-  Sparkles, Users, Waves, X,
+  ArrowDown,
+  ArrowLeftRight,
+  ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  ChevronDown,
+  Compass,
+  Heart,
+  MapPin,
+  Search,
+  SlidersHorizontal,
+  Users,
+  X,
 } from "lucide-react";
+
 import {
-  ACCOMMODATIONS, ADD_ONS, AMENITIES, BRAND, PHOTOS, RESORT_ZONES,
-  STAY_CATEGORIES, DEMO_NOTICES, formatPeso,
+  AMENITIES,
+  DEMO_NOTICES,
+  PHOTOS,
+  RESORT_ZONES,
+  STAY_CATEGORIES,
+  formatPeso,
+  getZone,
 } from "../../data/config.js";
+
 import { localDateKey } from "../../engine/resortEngine.js";
 import { useResort } from "../../context/ResortContext.jsx";
 
-function dateOffset(n) {
-  const date = new Date();
-  date.setHours(12, 0, 0, 0);
-  date.setDate(date.getDate() + n);
-  return localDateKey(date);
-}
-function formatDate(value) {
-  if (!value) return "—";
-  const date = new Date(`${value}T12:00:00`);
-  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString("en-PH", { month: "short", day: "numeric", year: "numeric" });
-}
+import {
+  CoastalContours,
+  Reveal,
+  TideCompass,
+} from "../../components/StayMotion.jsx";
 
-export default function StaysPage() {
-  const [params] = useSearchParams();
-  const { accommodations, favorites, actions, getQuote } = useResort();
-  const [category, setCategory] = useState("all");
-  const [zone, setZone] = useState(params.get("zone") || "all");
-  const [search, setSearch] = useState("");
-  const [sort, setSort] = useState("recommended");
-  const [showFavorites, setShowFavorites] = useState(params.get("favorites") === "1");
-  const [guests, setGuests] = useState(Math.max(1, Math.min(8, Number(params.get("guests")) || 2)));
-  const [checkIn, setCheckIn] = useState(params.get("checkIn") || dateOffset(2));
-  const [checkOut, setCheckOut] = useState(params.get("checkOut") || dateOffset(3));
-  const [compare, setCompare] = useState([]);
-  const [selectedId, setSelectedId] = useState(params.get("stay") || null);
-  const [guestName, setGuestName] = useState("");
-  const [email, setEmail] = useState("");
-  const [addOnIds, setAddOnIds] = useState([]);
-  const [feedback, setFeedback] = useState("");
-  const [reservation, setReservation] = useState(null);
-  const selected = accommodations.find((s) => s.id === selectedId) || null;
+import "../../styles/stay-residences-architectural.css";
+
+const COMPARE_KEY = "your-stay-architectural-compare-v1";
+const money = formatPeso;
+
+const two = (n) => String(n).padStart(2, "0");
+
+const cap = (v, min, max) =>
+  Math.min(max, Math.max(min, Number(v) || min));
+
+const dateIn = (days) => {
+  const date = new Date();
+
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + days);
+
+  return localDateKey(date);
+};
+
+const nextDay = (key) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key || "")) {
+    return dateIn(1);
+  }
+
+  const d = new Date(`${key}T12:00:00`);
+
+  d.setDate(d.getDate() + 1);
+
+  return localDateKey(d);
+};
+
+const detailLink = (stay, dates) => {
+  const q = new URLSearchParams({
+    checkIn: dates.checkIn,
+    checkOut: dates.checkOut,
+    guests: String(Math.min(dates.guests, stay.maxGuests)),
+  });
+
+  return `/stays/${stay.id}?${q}`;
+};
+
+/* ===========================================
+   COMPARISON STUDIO
+=========================================== */
+
+function CompareStudio({
+  selected,
+  dates,
+  getQuote,
+  onRemove,
+  onClose,
+}) {
+  const ref = useRef(null);
+  const closeRef = useRef(onClose);
+
+  closeRef.current = onClose;
 
   useEffect(() => {
-    if (!selected) return;
-    const close = (event) => event.key === "Escape" && setSelectedId(null);
-    document.addEventListener("keydown", close);
-    return () => document.removeEventListener("keydown", close);
-  }, [selected]);
+    const previous = document.activeElement;
+    const overflow = document.body.style.overflow;
 
-  const results = useMemo(() => {
-    const query = search.toLowerCase().trim();
-    return accommodations
-      .filter((s) => category === "all" || s.category === category)
-      .filter((s) => zone === "all" || s.zoneId === zone)
-      .filter((s) => s.maxGuests >= guests)
-      .filter((s) => !showFavorites || favorites.includes(s.id))
-      .filter((s) => !query || `${s.name} ${s.description} ${s.amenities.join(" ")}`.toLowerCase().includes(query))
-      .sort((a, b) => sort === "price-low" ? a.nightlyRate - b.nightlyRate
-        : sort === "price-high" ? b.nightlyRate - a.nightlyRate
-          : sort === "capacity" ? b.maxGuests - a.maxGuests
-            : Number(b.featured) - Number(a.featured));
-  }, [accommodations, category, zone, search, guests, showFavorites, favorites, sort]);
+    document.body.style.overflow = "hidden";
 
-  const reservationGuests = selected ? Math.min(guests, selected.maxGuests) : guests;
-  const selectedQuote = selected ? getQuote({ accommodationId: selected.id, checkIn, checkOut, guests: reservationGuests, addOnIds }) : null;
-  const compareStays = compare.map((id) => accommodations.find((s) => s.id === id)).filter(Boolean);
+    ref.current?.querySelector("button")?.focus();
 
-  function openStay(id) {
-    setSelectedId(id);
-    setAddOnIds([]);
-    setFeedback("");
-    setReservation(null);
-  }
-  function changeCheckIn(next) {
-    setCheckIn(next);
-    if (next && checkOut <= next) {
-      const d = new Date(`${next}T12:00:00`);
-      d.setDate(d.getDate() + 1);
-      setCheckOut(localDateKey(d));
+    function keydown(event) {
+      if (event.key === "Escape") {
+        return closeRef.current();
+      }
+
+      if (event.key !== "Tab" || !ref.current) return;
+
+      const nodes = [
+        ...ref.current.querySelectorAll(
+          'a[href],button:not([disabled])'
+        ),
+      ];
+
+      if (!nodes.length) return;
+
+      if (
+        event.shiftKey &&
+        document.activeElement === nodes[0]
+      ) {
+        event.preventDefault();
+        nodes.at(-1).focus();
+      } else if (
+        !event.shiftKey &&
+        document.activeElement === nodes.at(-1)
+      ) {
+        event.preventDefault();
+        nodes[0].focus();
+      }
     }
+
+    document.addEventListener("keydown", keydown);
+
+    return () => {
+      document.body.style.overflow = overflow;
+      document.removeEventListener("keydown", keydown);
+
+      if (previous?.isConnected) previous.focus();
+    };
+  }, []);
+
+  const rows = [
+    ["Architecture", (s) => s.category.toUpperCase()],
+    ["Setting", (s) => getZone(s.zoneId)?.label || "—"],
+    ["Nightly rate", (s) => money(s.nightlyRate)],
+    ["Interior", (s) => `${s.sizeSqm} m²`],
+    ["Bedrooms / baths", (s) => `${s.bedrooms} / ${s.bathrooms}`],
+    ["Guest capacity", (s) => `Up to ${s.maxGuests}`],
+    [
+      "Private pool",
+      (s) =>
+        s.amenities.includes("private-pool")
+          ? "Included"
+          : "Not listed",
+    ],
+    [
+      "Ocean outlook",
+      (s) =>
+        s.amenities.includes("ocean-view")
+          ? "Included"
+          : "Not listed",
+    ],
+    [
+      "Selected date estimate",
+      (s) => {
+        const q = getQuote({
+          accommodationId: s.id,
+          ...dates,
+          guests: Math.min(dates.guests, s.maxGuests),
+          addOnIds: [],
+        });
+
+        return q.ok ? money(q.total) : "Unavailable";
+      },
+    ],
+  ];
+
+  return createPortal(
+    <div
+      className="yr2-modal-backdrop"
+      onMouseDown={(e) =>
+        e.target === e.currentTarget && onClose()
+      }
+    >
+      <section
+        className="yr2-compare-modal"
+        ref={ref}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Compare selected villas"
+      >
+        <div className="yr2-compare-heading">
+          <div>
+            <span className="yr2-eyebrow">
+              THE SELECTION ROOM / SIDE BY SIDE
+            </span>
+
+            <h2>
+              Consider the <em>differences.</em>
+            </h2>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close comparison"
+          >
+            <X size={22} />
+          </button>
+        </div>
+
+        <div className="yr2-compare-scroll">
+          <div
+            className="yr2-compare-matrix"
+            style={{ "--columns": selected.length }}
+          >
+            <div className="yr2-compare-label">
+              VILLA INDEX / CONCEPT
+            </div>
+
+            {selected.map((stay) => (
+              <div className="yr2-compare-cover" key={stay.id}>
+                <img
+                  src={stay.images[0]}
+                  alt={`Illustrative ${stay.name}`}
+                />
+
+                <strong>{stay.name}</strong>
+
+                <button
+                  type="button"
+                  onClick={() => onRemove(stay.id)}
+                >
+                  <X size={13} /> REMOVE
+                </button>
+              </div>
+            ))}
+
+            {rows.map(([label, getValue]) => (
+              <div className="yr2-compare-line" key={label}>
+                <span>{label}</span>
+
+                {selected.map((stay) => (
+                  <strong key={stay.id}>
+                    {getValue(stay)}
+                  </strong>
+                ))}
+              </div>
+            ))}
+
+            <div className="yr2-compare-line yr2-compare-final">
+              <span>NEXT CHAPTER</span>
+
+              {selected.map((stay) => (
+                <Link
+                  key={stay.id}
+                  to={detailLink(stay, dates)}
+                  onClick={onClose}
+                >
+                  EXPLORE <ArrowUpRight size={14} />
+                </Link>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <p className="yr2-micro-note">
+          Rates, photographs and availability are illustrative.
+          The estimates above come from the local booking engine.
+        </p>
+      </section>
+    </div>,
+    document.body
+  );
+}
+
+/* ===========================================
+   RESIDENCE FOLIO
+=========================================== */
+
+function StayPlate({
+  stay,
+  index,
+  dates,
+  saved,
+  selected,
+  onFavorite,
+  onCompare,
+  getQuote,
+}) {
+  const quote = getQuote({
+    accommodationId: stay.id,
+    ...dates,
+    guests: Math.min(dates.guests, stay.maxGuests),
+    addOnIds: [],
+  });
+
+  const amenityNames = stay.amenities.slice(0, 3).map(
+    (id) => AMENITIES.find((a) => a.id === id)?.label || id
+  );
+
+  return (
+    <Reveal
+      as="article"
+      className={`yr2-residence yr2-residence--${index % 4}`}
+      delay={(index % 2) * 100}
+    >
+      <div className="yr2-residence-media">
+        <Link
+          to={detailLink(stay, dates)}
+          className="yr2-residence-photo"
+          aria-label={`Explore ${stay.name}`}
+        >
+          <img
+            src={stay.images[0]}
+            loading="lazy"
+            alt={`Illustrative architecture of ${stay.name}`}
+          />
+        </Link>
+
+        <div className="yr2-residence-image-index">
+          <span>YS / {two(index + 1)}</span>
+          <span>
+            {getZone(stay.zoneId)?.label?.toUpperCase()}
+          </span>
+        </div>
+
+        <div className="yr2-residence-secondary">
+          <img
+            src={stay.images[1] || stay.images[0]}
+            loading="lazy"
+            alt={`Illustrative interior of ${stay.name}`}
+          />
+          <span>SPACE STUDY {two(index + 1)}</span>
+        </div>
+
+        <button
+          className={`yr2-heart ${saved ? "is-saved" : ""}`}
+          type="button"
+          onClick={onFavorite}
+          aria-label={`${saved ? "Remove" : "Save"} ${stay.name}`}
+          aria-pressed={saved}
+        >
+          <Heart
+            size={20}
+            fill={saved ? "currentColor" : "none"}
+          />
+        </button>
+      </div>
+
+      <div className="yr2-residence-details">
+        <div className="yr2-residence-label">
+          <span>THE COLLECTION / {two(index + 1)}</span>
+          <span>
+            {stay.sizeSqm} M² · {stay.bedrooms} BEDROOMS
+          </span>
+        </div>
+
+        <h3>
+          <Link to={detailLink(stay, dates)}>
+            {stay.name}
+          </Link>
+        </h3>
+
+        <p>{stay.longDescription}</p>
+
+        <div className="yr2-residence-features">
+          {amenityNames.map((a) => (
+            <span key={a}>{a}</span>
+          ))}
+        </div>
+
+        <div className="yr2-residence-quote">
+          <span
+            className={
+              quote.ok ? "available" : "unavailable"
+            }
+          >
+            <i />
+
+            {quote.ok
+              ? `DEMO AVAILABLE · ${quote.nights} NIGHTS`
+              : quote.error}
+          </span>
+
+          <strong>
+            {quote.ok ? money(quote.total) : "—"}
+
+            <small>
+              {quote.ok
+                ? " / STAY ESTIMATE"
+                : " / NO QUOTE"}
+            </small>
+          </strong>
+        </div>
+
+        <div className="yr2-residence-actions">
+          <Link to={detailLink(stay, dates)}>
+            VIEW RESIDENCE
+            <ArrowUpRight size={17} />
+          </Link>
+
+          <button
+            type="button"
+            onClick={onCompare}
+            aria-pressed={selected}
+            className={selected ? "selected" : ""}
+          >
+            <ArrowLeftRight size={16} />
+            {selected ? "SELECTED" : "COMPARE"}
+          </button>
+        </div>
+      </div>
+    </Reveal>
+  );
+}
+
+/* ===========================================
+   THE ARCHITECTURAL DISCOVERY CATALOG
+=========================================== */
+
+export default function StaysPage() {
+  const [params, setParams] = useSearchParams();
+
+  const {
+    accommodations,
+    favorites,
+    actions,
+    getQuote,
+    reservations,
+    maintenanceBlocks,
+  } = useResort();
+
+  const highest = Math.max(
+    ...accommodations.map((s) => s.nightlyRate),
+    1000
+  );
+
+  const maxGuests = Math.max(
+    ...accommodations.map((s) => s.maxGuests),
+    1
+  );
+
+  const [dates, setDates] = useState(() => ({
+    checkIn: params.get("checkIn") || dateIn(2),
+    checkOut: params.get("checkOut") || dateIn(4),
+    guests: cap(params.get("guests") || 2, 1, maxGuests),
+  }));
+
+  const [query, setQuery] = useState(params.get("q") || "");
+  const [zone, setZone] = useState(
+    params.get("zone") || "all"
+  );
+
+  const [category, setCategory] = useState(
+    params.get("category") || "all"
+  );
+
+  const [amenity, setAmenity] = useState("all");
+  const [price, setPrice] = useState(highest);
+  const [sort, setSort] = useState("editorial");
+
+  const [onlyAvailable, setOnlyAvailable] = useState(false);
+  const [savedOnly, setSavedOnly] = useState(
+    params.get("favorites") === "1"
+  );
+
+  const [expanded, setExpanded] = useState(false);
+
+  const [compare, setCompare] = useState(() => {
+    try {
+      const value = JSON.parse(
+        localStorage.getItem(COMPARE_KEY) || "[]"
+      );
+
+      return Array.isArray(value)
+        ? value
+            .filter((id) =>
+              accommodations.some((s) => s.id === id)
+            )
+            .slice(0, 3)
+        : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    if (params.get("favorites") === "1") {
+      setSavedOnly(true);
+    }
+
+    const incoming = params.get("zone");
+
+    if (RESORT_ZONES.some((z) => z.id === incoming)) {
+      setZone(incoming);
+    }
+
+    const checkIn = params.get("checkIn");
+    const checkOut = params.get("checkOut");
+
+    if (checkIn && checkOut) {
+      setDates((d) => ({
+        ...d,
+        checkIn,
+        checkOut,
+      }));
+    }
+  }, [params]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        COMPARE_KEY,
+        JSON.stringify(compare)
+      );
+    } catch {
+      // Comparison storage is optional.
+    }
+  }, [compare]);
+
+  const shortlist = compare
+    .map((id) => accommodations.find((s) => s.id === id))
+    .filter(Boolean);
+
+  const listed = useMemo(
+    () =>
+      accommodations
+        .filter((stay) => {
+          const text = `
+            ${stay.name}
+            ${stay.description}
+            ${getZone(stay.zoneId)?.label}
+            ${stay.amenities.join(" ")}
+          `.toLowerCase();
+
+          if (
+            query &&
+            !text.includes(query.trim().toLowerCase())
+          ) {
+            return false;
+          }
+
+          if (zone !== "all" && stay.zoneId !== zone) {
+            return false;
+          }
+
+          if (
+            category !== "all" &&
+            stay.category !== category
+          ) {
+            return false;
+          }
+
+          if (
+            amenity !== "all" &&
+            !stay.amenities.includes(amenity)
+          ) {
+            return false;
+          }
+
+          if (
+            stay.nightlyRate > price ||
+            stay.maxGuests < dates.guests
+          ) {
+            return false;
+          }
+
+          if (
+            savedOnly &&
+            !favorites.includes(stay.id)
+          ) {
+            return false;
+          }
+
+          if (
+            onlyAvailable &&
+            !getQuote({
+              accommodationId: stay.id,
+              ...dates,
+              addOnIds: [],
+            }).ok
+          ) {
+            return false;
+          }
+
+          return true;
+        })
+        .sort((a, b) => {
+          if (sort === "price-up") {
+            return a.nightlyRate - b.nightlyRate;
+          }
+
+          if (sort === "price-down") {
+            return b.nightlyRate - a.nightlyRate;
+          }
+
+          if (sort === "size") {
+            return b.sizeSqm - a.sizeSqm;
+          }
+
+          return Number(b.featured) - Number(a.featured);
+        }),
+    [
+      accommodations,
+      favorites,
+      reservations,
+      maintenanceBlocks,
+      getQuote,
+      query,
+      zone,
+      category,
+      amenity,
+      price,
+      dates,
+      savedOnly,
+      onlyAvailable,
+      sort,
+    ]
+  );
+
+  function changeDate(key, value) {
+    setDates((prev) => ({
+      ...prev,
+      [key]: value,
+      ...(key === "checkIn" &&
+      value &&
+      prev.checkOut <= value
+        ? { checkOut: nextDay(value) }
+        : {}),
+    }));
   }
-  function toggleCompare(id) {
-    setCompare((current) => current.includes(id)
-      ? current.filter((item) => item !== id)
-      : current.length < 2 ? [...current, id] : current);
+
+  function toggleComparison(id) {
+    if (compare.includes(id)) {
+      return setCompare((p) =>
+        p.filter((x) => x !== id)
+      );
+    }
+
+    if (compare.length >= 3) {
+      setNotice(
+        "The selection room holds three villas. Remove one before choosing another."
+      );
+      return;
+    }
+
+    setCompare((p) => [...p, id]);
+    setNotice("");
   }
-  function submitReservation(event) {
-    event.preventDefault();
-    if (!selectedQuote?.ok || !selected) return;
-    const result = actions.reserveStay({
-      accommodationId: selected.id, checkIn, checkOut, guests: reservationGuests,
-      addOnIds, guestName: guestName.trim(), email: email.trim(),
+
+  function clear() {
+    setQuery("");
+    setZone("all");
+    setCategory("all");
+    setAmenity("all");
+    setPrice(highest);
+    setSavedOnly(false);
+    setOnlyAvailable(false);
+    setSort("editorial");
+
+    setDates({
+      checkIn: dateIn(2),
+      checkOut: dateIn(4),
+      guests: 2,
     });
-    if (result.ok) {
-      setReservation(result.booking);
-      setFeedback("");
-    } else {
-      setFeedback(result.error || "Unable to save this demo reservation.");
+
+    setParams({}, { replace: true });
+  }
+
+  function toggleFavorite(id) {
+    const response = actions.toggleFavorite(id);
+
+    if (!response.ok) {
+      setNotice(
+        response.error ||
+          "Unable to update favorites."
+      );
     }
   }
 
   return (
-    <>
-      <section className="ys-stays-hero">
-        <img src={PHOTOS.villas} alt="Illustrative resort architecture and villa" />
-        <div className="ys-stays-hero__shade" />
-        <div className="ys-shell ys-stays-hero__content">
-          <span className="ys-kicker ys-kicker--light">THE COLLECTION / 01—04</span>
-          <h1 className="ys-display">A stay for<br /><em>every kind of escape.</em></h1>
-          <p>Private villas, intimate suites, and hideaways designed for doing just a little less.</p>
+    <div className="yr2-page yr2-catalog">
+      {/* ARCHITECTURAL INDEX HERO */}
+
+      <section className="yr2-index-hero">
+        <div className="yr2-index-copy">
+          <span className="yr2-eyebrow">
+            YOUR STAY / ARCHITECTURAL INDEX / VOL. 02
+          </span>
+
+          <div className="yr2-index-heading">
+            <span>THE UNHURRIED ATLAS</span>
+
+            <h1>
+              Spaces that
+              <br />
+              <em>stay with you.</em>
+            </h1>
+
+            <p>
+              Four imagined residences, each a different
+              way to inhabit the horizon. Discover them
+              by feeling, setting, scale, and the small
+              details that matter.
+            </p>
+          </div>
+
+          <a
+            href="#yr2-discovery"
+            className="yr2-hero-explore"
+          >
+            ENTER THE COLLECTION
+            <ArrowDown size={17} />
+          </a>
+
+          <TideCompass className="yr2-index-compass" />
+        </div>
+
+        <div className="yr2-index-photo">
+          <img
+            src={PHOTOS.pool}
+            alt="Illustrative tropical villa pool and architecture"
+          />
+
+          <CoastalContours pale />
+
+          <span className="yr2-index-vertical">
+            ARCHITECTURE / HORIZON / REST
+          </span>
+
+          <span className="yr2-index-image-note">
+            Y/S — FIELD STUDY 002
+          </span>
+
+          <div className="yr2-index-circle">
+            THE PRIVATE
+            <br />
+            COLLECTION
+            <br />
+            <strong>04</strong>
+          </div>
         </div>
       </section>
 
-      <section className="ys-shell ys-catalog ys-section" aria-label="Find your accommodation">
-        <div className="ys-section-head ys-catalog__head">
-          <div><span className="ys-kicker">THE COLLECTION</span><h2 className="ys-display">Make yourself <em>at home.</em></h2></div>
-          <p>Explore four imagined spaces, each with its own distinct atmosphere. Dates and rates are illustrative.</p>
-        </div>
+      {/* DISCOVERY STUDIO */}
 
-        <div className="ys-catalog-filter">
-          <label><span>CHECK IN</span><input type="date" min={dateOffset(0)} value={checkIn} onChange={(e) => changeCheckIn(e.target.value)} /></label>
-          <label><span>CHECK OUT</span><input type="date" min={checkIn || dateOffset(1)} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} /></label>
-          <label><span>GUESTS</span><select value={guests} onChange={(e) => setGuests(Number(e.target.value))}>
-            {Array.from({ length: 8 }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} {n === 1 ? "guest" : "guests"}</option>)}
-          </select></label>
-          <label><span>SETTING</span><select value={zone} onChange={(e) => setZone(e.target.value)}>
-            <option value="all">All settings</option>{RESORT_ZONES.map((z) => <option key={z.id} value={z.id}>{z.label}</option>)}
-          </select></label>
-        </div>
+      <section
+        className="yr2-discovery"
+        id="yr2-discovery"
+      >
+        <div className="yr2-shell">
+          <Reveal className="yr2-heading">
+            <div>
+              <span className="yr2-eyebrow">
+                01 / THE DISCOVERY STUDIO
+              </span>
 
-        <div className="ys-catalog__toolbar">
-          <div className="ys-tabs" aria-label="Accommodation type">
-            {STAY_CATEGORIES.map((c) => <button key={c.id} type="button" className={category === c.id ? "is-active" : ""}
-              onClick={() => setCategory(c.id)} aria-pressed={category === c.id}>{c.label}</button>)}
-          </div>
-          <div className="ys-catalog__tools">
-            <label className="ys-catalog__search"><Search size={16} /><input aria-label="Search stays" placeholder="Search stays" value={search} onChange={(e) => setSearch(e.target.value)} /></label>
-            <label className="ys-catalog__sort"><SlidersHorizontal size={16} /><select aria-label="Sort accommodations" value={sort} onChange={(e) => setSort(e.target.value)}>
-              <option value="recommended">Recommended</option><option value="price-low">Price: low to high</option><option value="price-high">Price: high to low</option><option value="capacity">Guest capacity</option>
-            </select></label>
-            <button type="button" className={`ys-only-favorites ${showFavorites ? "is-active" : ""}`} aria-pressed={showFavorites}
-              onClick={() => setShowFavorites((value) => !value)}><Heart size={16} /> Saved ({favorites.length})</button>
-          </div>
-        </div>
-        <div className="ys-catalog__count">SHOWING {results.length} OF {ACCOMMODATIONS.length} STAYS</div>
-        {results.length === 0 ? (
-          <div className="ys-empty"><Waves size={38} strokeWidth={1.2} /><h3>No stays found for those filters.</h3>
-            <p>Try fewer guests, a different setting, or show all accommodation types.</p>
-            <button type="button" className="ys-button" onClick={() => { setCategory("all"); setZone("all"); setGuests(2); setSearch(""); setShowFavorites(false); }}>Clear filters <ArrowRight size={18} /></button>
-          </div>
-        ) : (
-          <div className="ys-listing-grid">
-            {results.map((stay) => {
-              const liked = favorites.includes(stay.id);
-              const isCompared = compare.includes(stay.id);
-              const quote = getQuote({ accommodationId: stay.id, checkIn, checkOut, guests, addOnIds: [] });
-              return (
-                <article key={stay.id} className="ys-listing-card">
-                  <div className="ys-listing-card__image">
-                    <img src={stay.images[0]} alt={`Illustrative view of ${stay.name}`} loading="lazy" />
-                    <span className="ys-listing-card__badge">{stay.category === "villa" ? "PRIVATE VILLA" : stay.category === "suite" ? "COASTAL SUITE" : "NATURE HIDEAWAY"}</span>
-                    <button type="button" className={`ys-favorite ${liked ? "is-active" : ""}`} aria-pressed={liked} aria-label={liked ? `Unsave ${stay.name}` : `Save ${stay.name}`}
-                      onClick={() => actions.toggleFavorite(stay.id)}><Heart size={19} fill={liked ? "currentColor" : "none"} /></button>
-                  </div>
-                  <div className="ys-listing-card__body">
-                    <div className="ys-listing-card__meta"><span><BedDouble size={15} /> {stay.bedrooms} {stay.bedrooms === 1 ? "bedroom" : "bedrooms"}</span><span><Users size={15} /> Up to {stay.maxGuests} guests</span></div>
-                    <h3>{stay.name}</h3><p>{stay.description}</p>
-                    <div className="ys-amenity-chips">{stay.amenities.slice(0, 3).map((id) => <span key={id}>{AMENITIES.find((a) => a.id === id)?.label || id}</span>)}</div>
-                    <div className="ys-listing-card__availability"><span className={quote.ok ? "is-available" : ""} />{quote.ok ? `${quote.nights} night${quote.nights === 1 ? "" : "s"} available in demo` : (quote.error || "Change dates to check")}</div>
-                    <div className="ys-listing-card__bottom">
-                      <div className="ys-listing-card__price"><small>FROM / NIGHT</small><strong>{formatPeso(stay.nightlyRate)}</strong></div>
-                      <button type="button" className="ys-button" onClick={() => openStay(stay.id)}>Explore stay <ArrowUpRight size={18} /></button>
-                    </div>
-                    <label className="ys-compare-check"><input type="checkbox" checked={isCompared} onChange={() => toggleCompare(stay.id)} disabled={!isCompared && compare.length >= 2} /> Compare this stay</label>
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-        <p className="ys-photo-note">All accommodation names, prices, photographs and availability are examples for this concept website, not real resort offers.</p>
-      </section>
-
-      {compareStays.length > 0 && (
-        <aside className="ys-compare-bar" aria-label="Stay comparison">
-          <div className="ys-compare-bar__items"><strong>YOUR SHORTLIST</strong>{compareStays.map((stay) => <span key={stay.id}>{stay.name}<button type="button" aria-label={`Remove ${stay.name}`} onClick={() => toggleCompare(stay.id)}><X size={14} /></button></span>)}</div>
-          <button type="button" className="ys-button ys-button--light" disabled={compareStays.length < 2} onClick={() => document.getElementById("ys-compare-details")?.showModal()}>Compare {compareStays.length}/2 <ArrowUpRight size={17} /></button>
-        </aside>
-      )}
-
-      <dialog id="ys-compare-details" className="ys-dialog ys-compare-dialog">
-        <div className="ys-dialog__top"><span className="ys-kicker">SIDE BY SIDE</span><button type="button" aria-label="Close comparison" onClick={() => document.getElementById("ys-compare-details")?.close()}><X size={22} /></button></div>
-        <h2 className="ys-display">Find your <em>fit.</em></h2>
-        <div className="ys-comparison-grid">{compareStays.map((s) => <div key={s.id}>
-          <img src={s.images[0]} alt={`Illustrative ${s.name}`} /><h3>{s.name}</h3>
-          <p>{formatPeso(s.nightlyRate)} / night</p><p>{s.bedrooms} bedrooms · {s.bathrooms} bathrooms</p><p>Up to {s.maxGuests} guests · {s.sizeSqm} m²</p>
-          <button className="ys-button" type="button" onClick={() => { document.getElementById("ys-compare-details")?.close(); openStay(s.id); }}>View & reserve <ArrowRight size={17} /></button>
-        </div>)}</div>
-      </dialog>
-
-      {selected && (
-        <div className="ys-modal-layer" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedId(null); }}>
-          <section className="ys-booking-modal" role="dialog" aria-modal="true" aria-label={`Explore ${selected.name}`}>
-            <button type="button" className="ys-booking-modal__close" aria-label="Close booking details" onClick={() => setSelectedId(null)}><X size={23} /></button>
-            <div className="ys-booking-modal__cover"><img src={selected.images[0]} alt={`Illustrative accommodation ${selected.name}`} /></div>
-            <div className="ys-booking-modal__content">
-              {reservation ? (
-                <div className="ys-booking-success" role="status"><CheckCircle2 size={45} /><span className="ys-kicker">SAVED IN THIS BROWSER</span>
-                  <h2 className="ys-display">Your demo stay<br /><em>is reserved.</em></h2>
-                  <p>Reference: <strong>{reservation.id}</strong></p>
-                  <p>{formatDate(reservation.checkIn)} — {formatDate(reservation.checkOut)} · {reservation.guests} guest(s)</p>
-                  <p className="ys-booking-warning">This is not a real reservation. No email has been sent, and no payment was taken.</p>
-                  <button className="ys-button" type="button" onClick={() => setSelectedId(null)}>Back to collection <ArrowRight size={17} /></button>
-                </div>
-              ) : (
-                <>
-                  <span className="ys-kicker">YOUR PRIVATE ESCAPE</span><h2 className="ys-display">{selected.name}</h2>
-                  <p>{selected.longDescription}</p>
-                  <div className="ys-modal-highlights"><span>{selected.bedrooms} bedroom(s)</span><span>{selected.bathrooms} bathroom(s)</span><span>{selected.sizeSqm} m²</span><span>Max {selected.maxGuests} guests</span></div>
-                  <div className="ys-modal-amenities">{selected.amenities.map((id) => <span key={id}><Check size={15} /> {AMENITIES.find((a) => a.id === id)?.label || id}</span>)}</div>
-                  <form onSubmit={submitReservation} className="ys-booking-form">
-                    <div className="ys-booking-form__row"><label>CHECK IN<input required type="date" min={dateOffset(0)} value={checkIn} onChange={(e) => changeCheckIn(e.target.value)} /></label>
-                      <label>CHECK OUT<input required type="date" min={checkIn || dateOffset(1)} value={checkOut} onChange={(e) => setCheckOut(e.target.value)} /></label></div>
-                    <label>GUESTS<select value={reservationGuests} onChange={(e) => setGuests(Number(e.target.value))}>
-                      {Array.from({ length: selected.maxGuests }, (_, i) => i + 1).map((n) => <option key={n} value={n}>{n} {n === 1 ? "guest" : "guests"}</option>)}</select></label>
-                    <p className="ys-kicker ys-booking-form__addon-title">ENHANCE YOUR STAY / OPTIONAL</p>
-                    <div className="ys-booking-form__addons">{ADD_ONS.map((addon) => <label key={addon.id}><input type="checkbox" checked={addOnIds.includes(addon.id)} onChange={(e) => setAddOnIds((old) => e.target.checked ? [...old, addon.id] : old.filter((id) => id !== addon.id))} /> <span>{addon.name}</span><b>{addon.price ? `+${formatPeso(addon.price)}` : "On request"}</b></label>)}</div>
-                    <div className="ys-booking-form__row"><label>GUEST NAME<input required minLength={2} maxLength={80} value={guestName} onChange={(e) => setGuestName(e.target.value)} placeholder="Your name" /></label>
-                      <label>EMAIL<input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@example.com" /></label></div>
-                    <div className="ys-quote"><span>{selectedQuote?.ok ? `${selectedQuote.nights} night(s) · estimated total` : "Availability / estimate"}</span>
-                      <strong>{selectedQuote?.ok ? formatPeso(selectedQuote.total) : "—"}</strong></div>
-                    {!selectedQuote?.ok && <p className="ys-form-error" role="status">{selectedQuote?.error || "Please choose valid dates."}</p>}
-                    {feedback && <p className="ys-form-error" role="alert">{feedback}</p>}
-                    <button type="submit" className="ys-button ys-button--wide" disabled={!selectedQuote?.ok}>Save demo reservation <ArrowUpRight size={19} /></button>
-                    <p className="ys-booking-warning">{DEMO_NOTICES.booking} {DEMO_NOTICES.payment}</p>
-                  </form>
-                </>
-              )}
+              <h2>
+                Find your <em>elsewhere.</em>
+              </h2>
             </div>
-          </section>
+
+            <p>
+              Explore the collection with a custom
+              architectural index. Your selected nights
+              and guests are checked against the
+              actual local demo inventory.
+            </p>
+          </Reveal>
+
+          <div className="yr2-filter-studio">
+            <div className="yr2-filter-heading">
+              <span>
+                <SlidersHorizontal size={18} />
+                THE DISCOVERY CONTROLS
+              </span>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setExpanded((v) => !v)
+                }
+                aria-expanded={expanded}
+                aria-controls="yr2-advanced"
+              >
+                {expanded
+                  ? "LESS DETAIL"
+                  : "MORE FILTERS"}
+                <ChevronDown size={16} />
+              </button>
+            </div>
+
+            <div className="yr2-filter-primary">
+              <label className="yr2-date-field">
+                <span>
+                  <CalendarDays size={15} />
+                  ARRIVAL
+                </span>
+
+                <input
+                  type="date"
+                  aria-label="Arrival"
+                  min={dateIn(0)}
+                  value={dates.checkIn}
+                  onChange={(e) =>
+                    changeDate(
+                      "checkIn",
+                      e.target.value
+                    )
+                  }
+                />
+              </label>
+
+              <label className="yr2-date-field">
+                <span>
+                  <CalendarDays size={15} />
+                  DEPARTURE
+                </span>
+
+                <input
+                  type="date"
+                  aria-label="Departure"
+                  min={nextDay(dates.checkIn)}
+                  value={dates.checkOut}
+                  onChange={(e) =>
+                    changeDate(
+                      "checkOut",
+                      e.target.value
+                    )
+                  }
+                />
+              </label>
+
+              <label className="yr2-date-field">
+                <span>
+                  <Users size={15} />
+                  PEOPLE
+                </span>
+
+                <select
+                  value={dates.guests}
+                  onChange={(e) =>
+                    changeDate(
+                      "guests",
+                      Number(e.target.value)
+                    )
+                  }
+                >
+                  {Array.from(
+                    { length: maxGuests },
+                    (_, i) => i + 1
+                  ).map((g) => (
+                    <option key={g} value={g}>
+                      {g} {g === 1 ? "guest" : "guests"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="yr2-date-field">
+                <span>
+                  <MapPin size={15} />
+                  LANDSCAPE
+                </span>
+
+                <select
+                  value={zone}
+                  onChange={(e) =>
+                    setZone(e.target.value)
+                  }
+                >
+                  <option value="all">
+                    Any setting
+                  </option>
+
+                  {RESORT_ZONES.map((z) => (
+                    <option value={z.id} key={z.id}>
+                      {z.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <div
+              className="yr2-types"
+              role="group"
+              aria-label="Accommodation type"
+            >
+              {STAY_CATEGORIES.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className={
+                    category === item.id
+                      ? "active"
+                      : ""
+                  }
+                  aria-pressed={
+                    category === item.id
+                  }
+                  onClick={() =>
+                    setCategory(item.id)
+                  }
+                >
+                  {item.label}
+
+                  <sup>
+                    {item.id === "all"
+                      ? accommodations.length
+                      : accommodations.filter(
+                          (s) =>
+                            s.category === item.id
+                        ).length}
+                  </sup>
+                </button>
+              ))}
+            </div>
+
+            <div
+              id="yr2-advanced"
+              className={`yr2-advanced ${
+                expanded ? "is-open" : ""
+              }`}
+              hidden={!expanded}
+            >
+              <div className="yr2-advanced-grid">
+                <label className="yr2-search">
+                  <Search size={19} />
+
+                  <input
+                    type="search"
+                    aria-label="Search villas"
+                    placeholder="A villa, a setting, a feeling..."
+                    value={query}
+                    onChange={(e) =>
+                      setQuery(e.target.value)
+                    }
+                  />
+                </label>
+
+                <label className="yr2-select-label">
+                  SORT THE INDEX
+
+                  <select
+                    value={sort}
+                    onChange={(e) =>
+                      setSort(e.target.value)
+                    }
+                  >
+                    <option value="editorial">
+                      Curator's selection
+                    </option>
+                    <option value="price-up">
+                      Lowest nightly rate
+                    </option>
+                    <option value="price-down">
+                      Highest nightly rate
+                    </option>
+                    <option value="size">
+                      Largest architecture
+                    </option>
+                  </select>
+                </label>
+
+                <label className="yr2-select-label">
+                  SIGNATURE DETAIL
+
+                  <select
+                    value={amenity}
+                    onChange={(e) =>
+                      setAmenity(e.target.value)
+                    }
+                  >
+                    <option value="all">
+                      All amenities
+                    </option>
+
+                    {AMENITIES.map((a) => (
+                      <option
+                        key={a.id}
+                        value={a.id}
+                      >
+                        {a.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="yr2-advanced-foot">
+                <label className="yr2-budget">
+                  <span>
+                    MAXIMUM RATE / NIGHT
+                    <strong>{money(price)}</strong>
+                  </span>
+
+                  <input
+                    type="range"
+                    min="0"
+                    max={highest}
+                    step="100"
+                    value={price}
+                    onChange={(e) =>
+                      setPrice(
+                        Number(e.target.value)
+                      )
+                    }
+                  />
+                </label>
+
+                <div className="yr2-switches">
+                  <button
+                    type="button"
+                    aria-pressed={savedOnly}
+                    className={
+                      savedOnly ? "active" : ""
+                    }
+                    onClick={() =>
+                      setSavedOnly((v) => !v)
+                    }
+                  >
+                    <Heart size={15} />
+                    SAVED ONLY
+                  </button>
+
+                  <button
+                    type="button"
+                    aria-pressed={onlyAvailable}
+                    className={
+                      onlyAvailable ? "active" : ""
+                    }
+                    onClick={() =>
+                      setOnlyAvailable((v) => !v)
+                    }
+                  >
+                    <CheckCircle2 size={15} />
+                    AVAILABLE ONLY
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="yr2-filter-bottom">
+              <span>
+                <strong>{two(listed.length)}</strong>
+                RESIDENCES IN VIEW
+                <small>/ 04 STUDIES</small>
+              </span>
+
+              <button
+                type="button"
+                onClick={clear}
+              >
+                RESET DISCOVERY
+                <X size={14} />
+              </button>
+            </div>
+          </div>
+
+          {/* ASYMMETRICAL VILLA COLLECTION */}
+
+          {listed.length > 0 ? (
+            <div className="yr2-residence-grid">
+              {listed.map((stay, index) => (
+                <StayPlate
+                  key={stay.id}
+                  stay={stay}
+                  index={index}
+                  dates={dates}
+                  saved={favorites.includes(stay.id)}
+                  selected={compare.includes(stay.id)}
+                  onFavorite={() =>
+                    toggleFavorite(stay.id)
+                  }
+                  onCompare={() =>
+                    toggleComparison(stay.id)
+                  }
+                  getQuote={getQuote}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="yr2-no-match">
+              <Compass
+                size={42}
+                strokeWidth={1}
+              />
+
+              <h3>
+                Not every horizon
+                <br />
+                <em>fits today.</em>
+              </h3>
+
+              <p>
+                Nothing matches those selections.
+                Try a different setting, more
+                flexible dates or fewer filters.
+              </p>
+
+              <button
+                type="button"
+                onClick={clear}
+              >
+                RESET YOUR SEARCH
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          )}
+
+          {notice && (
+            <p
+              className="yr2-message"
+              role="status"
+            >
+              {notice}
+            </p>
+          )}
+
+          <div className="yr2-index-foot">
+            <span>
+              ILLUSTRATIVE RESIDENCES / NOT A LIVE RESORT
+            </span>
+
+            <span>
+              YS — PRIVATE COLLECTION 2026
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* EDITORIAL OUTRO */}
+
+      <section className="yr2-chapter-outro">
+        <CoastalContours pale />
+
+        <div>
+          <span className="yr2-eyebrow">
+            BEYOND THE RESIDENCE / 03
+          </span>
+
+          <h2>
+            The horizon is
+            <br />
+            <em>just the beginning.</em>
+          </h2>
+
+          <p>
+            Stay for the space. Remember everything
+            that happens around it.
+          </p>
+
+          <Link to="/experiences">
+            DISCOVER THE EXPERIENCES
+            <ArrowUpRight size={19} />
+          </Link>
+        </div>
+
+        <img
+          src={PHOTOS.terrace}
+          alt="Illustrative tropical terrace"
+          loading="lazy"
+        />
+      </section>
+
+      <p className="yr2-legal">
+        {DEMO_NOTICES.images} {DEMO_NOTICES.booking}
+      </p>
+
+      {/* COMPARISON SHORTLIST */}
+
+      {shortlist.length > 0 && (
+        <div
+          className="yr2-shortlist"
+          role="region"
+          aria-label="Your comparison shortlist"
+        >
+          <div>
+            <span>
+              SELECTION ROOM / {shortlist.length} OF 3
+            </span>
+
+            <strong>
+              {shortlist
+                .map((s) => s.name)
+                .join(" · ")}
+            </strong>
+          </div>
+
+          <div>
+            <button
+              type="button"
+              onClick={() => setCompare([])}
+            >
+              CLEAR <X size={14} />
+            </button>
+
+            <button
+              type="button"
+              disabled={shortlist.length < 2}
+              onClick={() =>
+                setCompareOpen(true)
+              }
+            >
+              COMPARE VILLAS
+              <ArrowUpRight size={17} />
+            </button>
+          </div>
         </div>
       )}
-    </>
+
+      {compareOpen && shortlist.length >= 2 && (
+        <CompareStudio
+          selected={shortlist}
+          dates={dates}
+          getQuote={getQuote}
+          onRemove={toggleComparison}
+          onClose={() =>
+            setCompareOpen(false)
+          }
+        />
+      )}
+    </div>
   );
 }

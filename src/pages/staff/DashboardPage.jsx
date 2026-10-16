@@ -1,4 +1,3 @@
-import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import {
@@ -7,11 +6,9 @@ import {
   BedDouble,
   CalendarDays,
   CheckCircle2,
+  CircleDollarSign,
   Clock3,
-  DollarSign,
-  ShieldCheck,
-  Sparkles,
-  Users,
+  Waves,
   Wrench,
 } from "lucide-react";
 
@@ -20,366 +17,507 @@ import {
   PHOTOS,
 } from "../../data/config.js";
 
-import { localDateKey } from "../../engine/resortEngine.js";
-import { useResort } from "../../context/ResortContext.jsx";
+import {
+  localDateKey,
+} from "../../engine/resortEngine.js";
 
-function formatDate(value) {
-  if (!value) return "—";
+import {
+  useResort,
+} from "../../context/ResortContext.jsx";
 
-  return new Date(`${value}T12:00:00`).toLocaleDateString(
-    "en-PH",
-    { month: "short", day: "numeric", year: "numeric" }
-  );
+function dayOffset(offset) {
+  const date = new Date();
+
+  date.setHours(12, 0, 0, 0);
+  date.setDate(date.getDate() + offset);
+
+  return localDateKey(date);
 }
 
-function StatCard({ icon: Icon, label, value, detail }) {
+function briefDate(key) {
+  return new Date(
+    `${key}T12:00:00`
+  ).toLocaleDateString("en-PH", {
+    month: "short",
+    day: "numeric",
+  });
+}
+
+function Metric({
+  index,
+  icon: Icon,
+  label,
+  value,
+  note,
+}) {
   return (
-    <article className="ys5-stat-card">
-      <div className="ys5-stat-card-top">
-        <span>{label}</span>
-        <Icon size={21} strokeWidth={1.5} />
+    <article className="op4-metric">
+      <div>
+        <span>0{index} / {label}</span>
+        <Icon
+          size={20}
+          strokeWidth={1.4}
+        />
       </div>
 
       <strong>{value}</strong>
-      <small>{detail}</small>
+      <small>{note}</small>
     </article>
   );
 }
 
 export default function DashboardPage() {
   const {
-    stats,
+    accommodations,
     reservations,
     maintenanceBlocks,
-    accommodations,
     activity,
+    stats,
   } = useResort();
 
-  const today = localDateKey();
+  const today = dayOffset(0);
 
-  const arrivals = useMemo(
-    () =>
-      reservations
-        .filter(
-          (item) =>
-            item.status === "confirmed" &&
-            item.checkIn >= today
-        )
-        .sort((a, b) => a.checkIn.localeCompare(b.checkIn))
-        .slice(0, 5),
-    [reservations, today]
+  const occupied = reservations.filter(
+    (booking) =>
+      booking.status === "checked_in" &&
+      booking.checkIn <= today &&
+      today < booking.checkOut
   );
 
-  const currentlyOccupied = useMemo(
-    () =>
-      reservations.filter(
-        (item) => item.status === "checked_in"
-      ),
-    [reservations]
-  );
+  const arrivals = reservations
+    .filter(
+      (booking) =>
+        booking.status === "confirmed" &&
+        booking.checkIn >= today
+    )
+    .sort((a, b) =>
+      a.checkIn.localeCompare(b.checkIn)
+    )
+    .slice(0, 4);
 
-  const bookingActivity = useMemo(() => {
-    const result = [];
+  const counts = Array.from(
+    { length: 7 },
+    (_, index) => {
+      const key = dayOffset(index - 6);
 
-    for (let offset = 6; offset >= 0; offset--) {
-      const date = new Date();
-      date.setHours(12, 0, 0, 0);
-      date.setDate(date.getDate() - offset);
-
-      const key = localDateKey(date);
-
-      const count = reservations.filter((item) => {
-        return (
-          item.createdAt &&
-          localDateKey(new Date(item.createdAt)) === key
-        );
-      }).length;
-
-      result.push({
+      return {
         key,
-        label: date.toLocaleDateString("en-PH", {
+
+        label: new Date(
+          `${key}T12:00:00`
+        ).toLocaleDateString("en-PH", {
           weekday: "short",
         }),
-        count,
-      });
+
+        count: reservations.filter(
+          (booking) =>
+            booking.createdAt &&
+            localDateKey(
+              new Date(booking.createdAt)
+            ) === key
+        ).length,
+      };
     }
-
-    return result;
-  }, [reservations]);
-
-  const maxCount = Math.max(
-    1,
-    ...bookingActivity.map((item) => item.count)
   );
 
-  const latestActivity = [...activity]
-    .reverse()
-    .slice(0, 6);
+  const peak = Math.max(
+    1,
+    ...counts.map((item) => item.count)
+  );
 
-  const occupiedCount = currentlyOccupied.length;
+  const occupiedIds = new Set(
+    occupied.map(
+      (booking) => booking.accommodationId
+    )
+  );
 
-  const occupancyPct = accommodations.length
-    ? Math.round(
-        (occupiedCount / accommodations.length) * 100
+  const blockedIds = new Set(
+    maintenanceBlocks
+      .filter(
+        (block) =>
+          block.checkIn <= today &&
+          today < block.checkOut
       )
-    : 0;
+      .map(
+        (block) => block.accommodationId
+      )
+  );
 
-  const getStayName = (id) =>
-    accommodations.find((stay) => stay.id === id)?.name ||
-    "Resort accommodation";
+  const stayName = (id) =>
+    accommodations.find(
+      (stay) => stay.id === id
+    )?.name || "Residence";
+
+  const recent = [...activity]
+    .reverse()
+    .slice(0, 4);
 
   return (
-    <div className="ys5-page">
-      <div className="ys5-page-heading">
+    <div className="op4-page">
+      {/* CINEMATIC COMMAND CENTER */}
+
+      <section className="op4-dash-hero">
         <div>
-          <span className="ys5-eyebrow">
-            THE RESORT AT A GLANCE
+          <span className="op4-eyebrow">
+            THE PRIVATE OPERATIONS JOURNAL / 01
           </span>
 
           <h1>
-            A clearer view of <em>every stay.</em>
+            Good mornings begin{" "}
+            <em>behind the scenes.</em>
           </h1>
 
           <p>
-            A refined operational overview of your
-            browser's YOUR STAY demonstration records.
+            An architectural overview of arrivals,
+            reservations, residence readiness and the
+            details that make a stay feel effortless.
           </p>
+
+          <div className="op4-hero-actions">
+            <Link to="/staff/reservations">
+              OPEN RESERVATION DESK
+              <ArrowUpRight size={17} />
+            </Link>
+
+            <Link to="/staff/calendar">
+              VIEW CALENDAR
+              <CalendarDays size={17} />
+            </Link>
+          </div>
         </div>
 
-        <Link
-          className="ys5-button"
-          to="/staff/reservations"
-        >
-          Manage reservations <ArrowUpRight size={17} />
-        </Link>
+        <div className="op4-hero-visual">
+          <img
+            src={PHOTOS.pool}
+            alt="Illustrative private resort pool"
+          />
+
+          <div
+            className="op4-orbit"
+            aria-hidden="true"
+          >
+            <span />
+            <span />
+            <span />
+          </div>
+
+          <div className="op4-hero-visual-label">
+            YS / RESORT OPERATIONS — DEMO
+          </div>
+        </div>
+      </section>
+
+      <div className="op4-briefline">
+        <span>
+          OPERATIONS BRIEF /{" "}
+          {briefDate(today).toUpperCase()}
+        </span>
+
+        <span>
+          ALL FIGURES ARE LOCAL DEMONSTRATION RECORDS
+        </span>
       </div>
 
-      <section className="ys5-stat-grid" aria-label="Resort metrics">
-        <StatCard
+      {/* OPERATIONAL METRICS */}
+
+      <section
+        className="op4-metrics"
+        aria-label="Resort operational metrics"
+      >
+        <Metric
+          index={1}
           icon={CalendarDays}
-          label="Total demo reservations"
+          label="DEMO BOOKINGS"
           value={stats.totalReservations}
-          detail="Including cancelled reservations"
+          note="Includes all historical statuses"
         />
 
-        <StatCard
+        <Metric
+          index={2}
           icon={CheckCircle2}
-          label="Active reservations"
+          label="ACTIVE RESERVATIONS"
           value={stats.activeReservations}
-          detail="Confirmed and checked-in"
+          note="Confirmed and checked in"
         />
 
-        <StatCard
+        <Metric
+          index={3}
           icon={BedDouble}
-          label="Currently checked-in"
-          value={stats.checkedIn}
-          detail="Based on demo booking statuses"
+          label="CURRENTLY CHECKED IN"
+          value={occupied.length}
+          note={`Of ${accommodations.length} concept residences`}
         />
 
-        <StatCard
-          icon={DollarSign}
-          label="Demo booking value"
+        <Metric
+          index={4}
+          icon={CircleDollarSign}
+          label="BOOKED DEMO VALUE"
           value={formatPeso(stats.bookedDemoValue)}
-          detail="Not collected revenue"
+          note="Not collected revenue"
         />
       </section>
 
-      <div className="ys5-dashboard-grid">
-        <section className="ys5-panel">
-          <div className="ys5-panel-heading">
+      {/* BOOKINGS + VILLA READINESS */}
+
+      <div className="op4-dash-columns">
+        <section className="op4-panel op4-chart-panel">
+          <div className="op4-panel-head">
             <div>
-              <span className="ys5-eyebrow">
-                LAST SEVEN DAYS
+              <span className="op4-eyebrow">
+                02 / BOOKING PULSE
               </span>
-              <h2>Booking activity</h2>
-              <p>Reservations created per calendar day</p>
+
+              <h2>The last seven days.</h2>
             </div>
-            <CalendarDays size={22} />
+
+            <span className="op4-outline-mark">
+              07 DAYS
+            </span>
           </div>
 
           <div
-            className="ys5-chart"
+            className="op4-bars"
             role="img"
-            aria-label={`Seven-day reservation counts: ${bookingActivity
-              .map((item) => `${item.label} ${item.count}`)
-              .join(", ")}`}
+            aria-label={counts
+              .map(
+                (item) =>
+                  `${item.label}: ${item.count} reservations`
+              )
+              .join(", ")}
           >
-            {bookingActivity.map((item) => (
-              <div className="ys5-chart-column" key={item.key}>
+            {counts.map((item) => (
+              <div
+                className="op4-bar-item"
+                key={item.key}
+              >
                 <strong>{item.count}</strong>
-                <div className="ys5-chart-track">
-                  <div
-                    className="ys5-chart-bar"
+
+                <div className="op4-bar-track">
+                  <i
                     style={{
                       height: `${
-                        (item.count / maxCount) * 100
+                        (item.count / peak) * 100
                       }%`,
                     }}
                   />
                 </div>
-                <span>{item.label}</span>
+
+                <small>{item.label}</small>
               </div>
             ))}
           </div>
 
-          <p className="ys5-panel-footnote">
-            Chart includes demo reservations, including
-            those subsequently cancelled.
+          <p className="op4-panel-note">
+            Counted by local reservation creation
+            date, including subsequently cancelled
+            records.
           </p>
         </section>
 
-        <section className="ys5-panel ys5-occupancy-panel">
-          <div className="ys5-panel-heading">
+        <section className="op4-panel op4-occupancy">
+          <div className="op4-panel-head">
             <div>
-              <span className="ys5-eyebrow">
-                PROPERTY SNAPSHOT
+              <span className="op4-eyebrow">
+                03 / THE RESIDENCE KEY
               </span>
-              <h2>Occupancy overview</h2>
+
+              <h2>Today's room status.</h2>
             </div>
-            <Users size={22} />
+
+            <Waves size={24} />
           </div>
 
-          <div className="ys5-occupancy-number">
-            {occupancyPct}<span>%</span>
+          <div className="op4-occupancy-number">
+            <strong>
+              {accommodations.length
+                ? Math.round(
+                    (occupied.length /
+                      accommodations.length) *
+                      100
+                  )
+                : 0}
+              %
+            </strong>
+
+            <span>
+              CHECKED-IN SHARE
+              <br />
+              OF FOUR DEMO RESIDENCES
+            </span>
           </div>
 
-          <div
-            className="ys5-progress"
-            role="progressbar"
-            aria-valuenow={occupancyPct}
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-label="Checked-in villa percentage"
+          <div className="op4-room-stack">
+            {accommodations.map(
+              (stay, index) => (
+                <div
+                  key={stay.id}
+                  className="op4-room-row"
+                >
+                  <span>0{index + 1}</span>
+
+                  <strong>{stay.name}</strong>
+
+                  <b
+                    className={
+                      occupiedIds.has(stay.id)
+                        ? "is-occupied"
+                        : blockedIds.has(stay.id)
+                        ? "is-blocked"
+                        : "is-clear"
+                    }
+                  >
+                    {occupiedIds.has(stay.id)
+                      ? "CHECKED IN"
+                      : blockedIds.has(stay.id)
+                      ? "MAINTENANCE"
+                      : "NO GUEST CHECKED IN"}
+                  </b>
+                </div>
+              )
+            )}
+          </div>
+
+          <Link
+            className="op4-text-action"
+            to="/staff/villas"
           >
-            <div style={{ width: `${occupancyPct}%` }} />
-          </div>
-
-          <div className="ys5-occupancy-details">
-            <div>
-              <span>Checked in</span>
-              <strong>{occupiedCount}</strong>
-            </div>
-            <div>
-              <span>Total listed units</span>
-              <strong>{accommodations.length}</strong>
-            </div>
-            <div>
-              <span>Maintenance blocks</span>
-              <strong>{maintenanceBlocks.length}</strong>
-            </div>
-          </div>
-
-          <Link to="/staff/villas" className="ys5-text-link">
-            Manage villa availability
-            <ArrowRight size={17} />
+            OPEN VILLA OPERATIONS
+            <ArrowUpRight size={16} />
           </Link>
         </section>
       </div>
 
-      <div className="ys5-dashboard-grid">
-        <section className="ys5-panel">
-          <div className="ys5-panel-heading">
+      {/* ARRIVALS + ACTIVITY */}
+
+      <div className="op4-dash-columns op4-dash-columns--secondary">
+        <section className="op4-panel">
+          <div className="op4-panel-head">
             <div>
-              <span className="ys5-eyebrow">
-                YOUR UPCOMING GUESTS
+              <span className="op4-eyebrow">
+                04 / THE ARRIVAL SHEET
               </span>
-              <h2>Expected arrivals</h2>
+
+              <h2>Next arrivals.</h2>
             </div>
 
-            <Link to="/staff/reservations" className="ys5-text-link">
-              View all <ArrowRight size={16} />
-            </Link>
+            <Clock3 size={22} />
           </div>
 
-          {arrivals.length === 0 ? (
-            <div className="ys5-empty">
-              <Clock3 size={29} />
-              <p>No upcoming demo arrivals yet.</p>
-            </div>
-          ) : (
-            <div className="ys5-list">
+          {arrivals.length ? (
+            <div className="op4-arrivals">
               {arrivals.map((booking) => (
-                <div className="ys5-list-item" key={booking.id}>
-                  <div className="ys5-list-avatar">
-                    {booking.guestName?.charAt(0) || "G"}
-                  </div>
+                <div key={booking.id}>
+                  <time dateTime={booking.checkIn}>
+                    {briefDate(booking.checkIn)}
+                  </time>
 
-                  <div className="ys5-list-copy">
-                    <strong>{booking.guestName}</strong>
-                    <span>
-                      {getStayName(booking.accommodationId)}
-                    </span>
-                  </div>
+                  <span>
+                    <strong>
+                      {stayName(
+                        booking.accommodationId
+                      )}
+                    </strong>
 
-                  <div className="ys5-list-end">
-                    <strong>{formatDate(booking.checkIn)}</strong>
-                    <span>{booking.guests} guests</span>
-                  </div>
+                    <small>
+                      {booking.guestName} ·{" "}
+                      {booking.guests} guests ·{" "}
+                      {booking.id}
+                    </small>
+                  </span>
+
+                  <ArrowUpRight size={17} />
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="op4-empty">
+              No future confirmed arrivals in this
+              browser.
+
+              <Link to="/booking">
+                Create a demo stay
+                <ArrowRight size={14} />
+              </Link>
+            </div>
           )}
+
+          <Link
+            className="op4-text-action"
+            to="/staff/reservations"
+          >
+            GO TO RESERVATION DESK
+            <ArrowUpRight size={16} />
+          </Link>
         </section>
 
-        <section className="ys5-panel">
-          <div className="ys5-panel-heading">
+        <section className="op4-panel">
+          <div className="op4-panel-head">
             <div>
-              <span className="ys5-eyebrow">
-                ACTIVITY STREAM
+              <span className="op4-eyebrow">
+                05 / THE HOUSE LOG
               </span>
-              <h2>Recent operations</h2>
+
+              <h2>Recent activity.</h2>
             </div>
-            <Sparkles size={22} />
+
+            <Wrench size={22} />
           </div>
 
-          {latestActivity.length === 0 ? (
-            <div className="ys5-empty">
-              <ShieldCheck size={29} />
-              <p>No operational activity recorded yet.</p>
-            </div>
-          ) : (
-            <div className="ys5-activity-list">
-              {latestActivity.map((item) => (
-                <div key={item.id}>
-                  <span className="ys5-activity-dot" />
+          {recent.length ? (
+            <div className="op4-activity">
+              {recent.map((entry) => (
+                <div key={entry.id}>
+                  <span className="op4-activity-dot" />
+
                   <div>
                     <strong>
-                      {item.action.replaceAll("_", " ")}
+                      {entry.action.replaceAll(
+                        "_",
+                        " "
+                      )}
                     </strong>
-                    <p>{item.description}</p>
+
                     <small>
-                      {new Date(item.timestamp)
-                        .toLocaleString("en-PH")}
+                      {entry.description}
                     </small>
                   </div>
+
+                  <time>
+                    {new Date(
+                      entry.timestamp
+                    ).toLocaleDateString("en-PH", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </time>
                 </div>
               ))}
             </div>
+          ) : (
+            <div className="op4-empty">
+              Your local activity journal is empty.
+              Reservation and maintenance actions
+              will appear here.
+            </div>
           )}
+
+          <Link
+            className="op4-text-action"
+            to="/staff/reports"
+          >
+            EXPLORE PERFORMANCE
+            <ArrowUpRight size={16} />
+          </Link>
         </section>
       </div>
 
-      <section className="ys5-banner">
-        <div>
-          <span className="ys5-eyebrow">
-            HOUSEKEEPING & TURNOVER
-          </span>
-          <h2>
-            Every arrival begins with <em>attention to detail.</em>
-          </h2>
-          <p>
-            Coordinate turnover tasks and prepare each villa
-            for the next guest.
-          </p>
-          <Link className="ys5-button ys5-button-light" to="/staff/housekeeping">
-            Open housekeeping <ArrowUpRight size={17} />
-          </Link>
-        </div>
-        <img
-          src={PHOTOS.terrace}
-          alt="Illustrative resort suite and terrace"
-        />
-      </section>
+      <div className="op4-fine">
+        <CheckCircle2 size={16} />
+
+        DEMO-ONLY DASHBOARD · REVENUE COLLECTED:{" "}
+        {formatPeso(stats.collectedRevenue)} ·
+        NO LIVE BOOKINGS OR PAYMENTS
+      </div>
     </div>
   );
 }

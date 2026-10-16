@@ -1,46 +1,50 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+
 import {
   ArrowRight,
   ArrowUpRight,
-  CalendarDays,
   ChevronLeft,
   ChevronRight,
   Clock3,
   Wrench,
 } from "lucide-react";
 
-import { localDateKey } from "../../engine/resortEngine.js";
-import { useResort } from "../../context/ResortContext.jsx";
+import {
+  localDateKey,
+} from "../../engine/resortEngine.js";
 
-const WEEKDAYS = [
-  "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat",
-];
+import {
+  useResort,
+} from "../../context/ResortContext.jsx";
 
-function keyFor(year, month, day) {
-  return localDateKey(
-    new Date(year, month, day, 12, 0, 0)
+const todayKey = () => localDateKey();
+
+const dateKey = (year, month, day) =>
+  localDateKey(
+    new Date(year, month, day, 12)
   );
-}
 
-function addDays(key, amount) {
-  const [year, month, day] = key.split("-").map(Number);
-  return localDateKey(
-    new Date(year, month - 1, day + amount, 12)
-  );
-}
+const nextDay = (key) => {
+  const [year, month, day] =
+    key.split("-").map(Number);
 
-function prettyDate(key) {
-  return new Date(`${key}T12:00:00`).toLocaleDateString(
-    "en-PH",
-    {
-      weekday: "long",
-      month: "long",
-      day: "numeric",
-      year: "numeric",
-    }
+  return dateKey(
+    year,
+    month - 1,
+    day + 1
   );
-}
+};
+
+const fullDate = (key) =>
+  new Date(
+    `${key}T12:00:00`
+  ).toLocaleDateString("en-PH", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
 
 export default function CalendarPage() {
   const {
@@ -52,420 +56,552 @@ export default function CalendarPage() {
 
   const [month, setMonth] = useState(() => {
     const now = new Date();
+
     return {
       year: now.getFullYear(),
       index: now.getMonth(),
     };
   });
 
-  const [selectedStay, setSelectedStay] = useState("all");
-  const [selectedDate, setSelectedDate] = useState(
-    localDateKey()
+  const [day, setDay] = useState(todayKey);
+
+  const [selectedId, setSelectedId] = useState(
+    accommodations[0]?.id || ""
   );
 
-  const firstDay = new Date(
+  const today = todayKey();
+
+  const days = useMemo(
+    () =>
+      Array.from(
+        {
+          length: new Date(
+            month.year,
+            month.index + 1,
+            0
+          ).getDate(),
+        },
+        (_, index) =>
+          dateKey(
+            month.year,
+            month.index,
+            index + 1
+          )
+      ),
+    [month]
+  );
+
+  const monthLabel = new Date(
     month.year,
     month.index,
-    1,
-    12
-  );
-
-  const daysInMonth = new Date(
-    month.year,
-    month.index + 1,
-    0
-  ).getDate();
-
-  const monthLabel = firstDay.toLocaleDateString("en-PH", {
+    1
+  ).toLocaleDateString("en-PH", {
     month: "long",
     year: "numeric",
   });
 
-  const activeBookings = useMemo(
-    () =>
-      reservations.filter((booking) =>
-        ["confirmed", "checked_in"].includes(booking.status)
-      ),
-    [reservations]
+  const currentStay = accommodations.find(
+    (stay) => stay.id === selectedId
   );
 
-  function matchesSelectedStay(item) {
-    return (
-      selectedStay === "all" ||
-      item.accommodationId === selectedStay
-    );
-  }
+  const bookings = reservations.filter(
+    (booking) =>
+      ["confirmed", "checked_in"].includes(
+        booking.status
+      )
+  );
 
-  function eventsForDay(dayKey) {
-    const bookings = activeBookings.filter(
-      (booking) =>
-        matchesSelectedStay(booking) &&
-        booking.checkIn <= dayKey &&
-        dayKey < booking.checkOut
-    );
-
-    const blocks = maintenanceBlocks.filter(
-      (block) =>
-        matchesSelectedStay(block) &&
-        block.checkIn <= dayKey &&
-        dayKey < block.checkOut
+  const forDate = (items, stayId, date) =>
+    items.filter(
+      (item) =>
+        item.accommodationId === stayId &&
+        item.checkIn <= date &&
+        date < item.checkOut
     );
 
-    return { bookings, blocks };
-  }
+  const currentBookings = forDate(
+    bookings,
+    selectedId,
+    day
+  );
 
-  const cells = useMemo(() => {
-    const empty = firstDay.getDay();
-
-    return [
-      ...Array(empty).fill(null),
-      ...Array.from(
-        { length: daysInMonth },
-        (_, i) => keyFor(month.year, month.index, i + 1)
-      ),
-    ];
-  }, [month.year, month.index, daysInMonth]);
-
-  const selectedEvents = eventsForDay(selectedDate);
-
-  const today = localDateKey();
-  const isPast = selectedDate < today;
-
-  const selectedStayData = accommodations.find(
-    (stay) => stay.id === selectedStay
+  const currentBlocks = forDate(
+    maintenanceBlocks,
+    selectedId,
+    day
   );
 
   const availability =
-    selectedStayData && !isPast
+    currentStay && day >= today
       ? getAvailability({
-          accommodationId: selectedStayData.id,
-          checkIn: selectedDate,
-          checkOut: addDays(selectedDate, 1),
+          accommodationId: selectedId,
+          checkIn: day,
+          checkOut: nextDay(day),
         })
       : null;
 
-  const bookingParams =
-    selectedStayData && !isPast
-      ? new URLSearchParams({
-          stay: selectedStayData.id,
-          checkIn: selectedDate,
-          checkOut: addDays(selectedDate, 1),
-          guests: String(
-            Math.min(2, selectedStayData.maxGuests)
-          ),
-        }).toString()
-      : "";
+  const params = new URLSearchParams({
+    stay: selectedId,
+    checkIn: day,
+    checkOut: nextDay(day),
+    guests: String(
+      Math.min(
+        2,
+        currentStay?.maxGuests || 1
+      )
+    ),
+  });
 
-  function changeMonth(direction) {
-    const next = new Date(
+  const occupiedNights = accommodations.reduce(
+    (total, stay) =>
+      total +
+      days.filter(
+        (date) =>
+          forDate(
+            bookings,
+            stay.id,
+            date
+          ).length > 0
+      ).length,
+    0
+  );
+
+  const blockedNights = accommodations.reduce(
+    (total, stay) =>
+      total +
+      days.filter(
+        (date) =>
+          forDate(
+            maintenanceBlocks,
+            stay.id,
+            date
+          ).length > 0
+      ).length,
+    0
+  );
+
+  function moveMonth(offset) {
+    const date = new Date(
       month.year,
-      month.index + direction,
+      month.index + offset,
       1,
       12
     );
 
     setMonth({
-      year: next.getFullYear(),
-      index: next.getMonth(),
+      year: date.getFullYear(),
+      index: date.getMonth(),
     });
 
-    setSelectedDate(
-      keyFor(next.getFullYear(), next.getMonth(), 1)
+    setDay(
+      dateKey(
+        date.getFullYear(),
+        date.getMonth(),
+        1
+      )
     );
   }
 
   function jumpToday() {
-    const now = new Date();
+    const date = new Date();
 
     setMonth({
-      year: now.getFullYear(),
-      index: now.getMonth(),
+      year: date.getFullYear(),
+      index: date.getMonth(),
     });
 
-    setSelectedDate(localDateKey(now));
+    setDay(todayKey());
   }
 
-  const stayName = (id) =>
-    accommodations.find((stay) => stay.id === id)?.name ||
-    "Unknown accommodation";
+  function chooseCell(stayId, date) {
+    setSelectedId(stayId);
+    setDay(date);
+  }
 
   return (
-    <div className="ys5-page ys6-page">
-      <header className="ys5-page-heading">
+    <div className="op4-page">
+      <div className="op4-page-title">
         <div>
-          <span className="ys5-eyebrow">
-            YOUR STAY / RESERVATION TIMELINE
+          <span className="op4-eyebrow">
+            OPERATIONS / CHAPTER 03 · THE SPATIAL TIMELINE
           </span>
+
           <h1>
-            Every date, <em>every detail.</em>
+            Every date has <em>a story.</em>
           </h1>
+
           <p>
-            Explore upcoming stays and maintenance periods
-            across your resort's accommodation collection.
+            An architectural schedule of stays
+            and maintenance, connected to your
+            browser's demo reservations.
           </p>
         </div>
 
-        <Link className="ys5-button" to="/staff/villas">
+        <Link
+          className="op4-dark-button"
+          to="/staff/villas"
+        >
+          MANAGE BLOCKS
           <Wrench size={17} />
-          Manage date blocks
         </Link>
-      </header>
+      </div>
 
-      <div className="ys6-calendar-layout">
-        <section className="ys5-panel ys6-calendar-main">
-          <div className="ys6-calendar-toolbar">
+      {/* MONTH SUMMARY */}
+
+      <div className="op4-calendar-stats">
+        <div>
+          <span>RESERVATIONS / THIS VIEW</span>
+          <strong>{occupiedNights}</strong>
+          <small>
+            Villa-nights occupied in this month
+          </small>
+        </div>
+
+        <div>
+          <span>MAINTENANCE / THIS VIEW</span>
+          <strong>{blockedNights}</strong>
+          <small>
+            Villa-nights blocked in this month
+          </small>
+        </div>
+
+        <div>
+          <span>VILLAS / IN COLLECTION</span>
+
+          <strong>
+            {accommodations.length
+              .toString()
+              .padStart(2, "0")}
+          </strong>
+
+          <small>
+            Each has one demo inventory unit
+          </small>
+        </div>
+      </div>
+
+      <div className="op4-calendar-layout">
+        {/* RESERVATION MATRIX */}
+
+        <section className="op4-panel op4-calendar-panel">
+          <div className="op4-panel-head">
             <div>
-              <span className="ys5-eyebrow">
-                MONTHLY OVERVIEW
+              <span className="op4-eyebrow">
+                01 / RESERVATION TAPE
               </span>
+
               <h2>{monthLabel}</h2>
             </div>
 
-            <div className="ys6-calendar-controls">
+            <div className="op4-month-controls">
               <button
                 type="button"
-                onClick={() => changeMonth(-1)}
                 aria-label="Previous month"
+                onClick={() => moveMonth(-1)}
               >
-                <ChevronLeft size={21} />
+                <ChevronLeft size={19} />
               </button>
 
               <button
                 type="button"
                 onClick={jumpToday}
               >
-                Today
+                TODAY
               </button>
 
               <button
                 type="button"
-                onClick={() => changeMonth(1)}
                 aria-label="Next month"
+                onClick={() => moveMonth(1)}
               >
-                <ChevronRight size={21} />
+                <ChevronRight size={19} />
               </button>
             </div>
           </div>
 
-          <label className="ys5-field ys6-calendar-filter">
-            <span>ACCOMMODATION FILTER</span>
+          <div className="op4-calendar-legend">
+            <span>
+              <i className="op4-key op4-key--stay" />
+              ACTIVE BOOKING
+            </span>
+
+            <span>
+              <i className="op4-key op4-key--maint" />
+              MAINTENANCE
+            </span>
+
+            <span>
+              <i className="op4-key op4-key--today" />
+              TODAY
+            </span>
+          </div>
+
+          <div
+            className="op4-timeline-scroll"
+            tabIndex={0}
+            aria-label="Horizontally scrollable reservation calendar"
+          >
+            <div
+              className="op4-timeline"
+              style={{
+                "--op4-days": days.length,
+              }}
+            >
+              <div className="op4-timeline-label op4-timeline-corner">
+                RESIDENCE / DAY →
+              </div>
+
+              {days.map((date) => (
+                <div
+                  key={`heading-${date}`}
+                  className={`op4-timeline-date ${
+                    date === today
+                      ? "is-today"
+                      : ""
+                  }`}
+                >
+                  <small>
+                    {new Date(
+                      `${date}T12:00:00`
+                    )
+                      .toLocaleDateString("en-PH", {
+                        weekday: "short",
+                      })
+                      .slice(0, 2)}
+                  </small>
+
+                  <strong>
+                    {Number(date.slice(-2))}
+                  </strong>
+                </div>
+              ))}
+
+              {accommodations.map(
+                (stay, index) => (
+                  <div
+                    className="op4-timeline-line"
+                    key={stay.id}
+                  >
+                    <button
+                      type="button"
+                      className={`op4-timeline-label ${
+                        selectedId === stay.id
+                          ? "is-picked"
+                          : ""
+                      }`}
+                      onClick={() =>
+                        setSelectedId(stay.id)
+                      }
+                    >
+                      <span>
+                        0{index + 1} /{" "}
+                        {stay.category.toUpperCase()}
+                      </span>
+
+                      <strong>{stay.name}</strong>
+                    </button>
+
+                    {days.map((date) => {
+                      const isBooked =
+                        forDate(
+                          bookings,
+                          stay.id,
+                          date
+                        ).length > 0;
+
+                      const isBlocked =
+                        forDate(
+                          maintenanceBlocks,
+                          stay.id,
+                          date
+                        ).length > 0;
+
+                      return (
+                        <button
+                          type="button"
+                          key={date}
+                          onClick={() =>
+                            chooseCell(
+                              stay.id,
+                              date
+                            )
+                          }
+                          aria-pressed={
+                            day === date &&
+                            selectedId === stay.id
+                          }
+                          aria-label={`${
+                            stay.name
+                          }, ${fullDate(date)}: ${
+                            isBooked
+                              ? "reserved"
+                              : isBlocked
+                              ? "maintenance"
+                              : "no occupancy record"
+                          }`}
+                          className={[
+                            "op4-timecell",
+                            isBooked
+                              ? "is-reserved"
+                              : isBlocked
+                              ? "is-maintenance"
+                              : "",
+                            day === date &&
+                            selectedId === stay.id
+                              ? "is-selected"
+                              : "",
+                            date === today
+                              ? "is-today"
+                              : "",
+                          ].join(" ")}
+                        >
+                          <span />
+                        </button>
+                      );
+                    })}
+                  </div>
+                )
+              )}
+            </div>
+          </div>
+
+          <div className="op4-panel-note">
+            Select a date square to inspect that
+            villa. Check-out day is exclusive;
+            a villa is not counted occupied on
+            departure day unless another stay begins.
+          </div>
+        </section>
+
+        {/* SELECTED DAY INSPECTOR */}
+
+        <aside className="op4-panel op4-calendar-inspector">
+          <span className="op4-eyebrow">
+            02 / DAY INSPECTION
+          </span>
+
+          <h2>{fullDate(day)}</h2>
+
+          <label className="op4-field">
+            SELECT A RESIDENCE
 
             <select
-              value={selectedStay}
+              value={selectedId}
               onChange={(event) =>
-                setSelectedStay(event.target.value)
+                setSelectedId(event.target.value)
               }
             >
-              <option value="all">All accommodations</option>
               {accommodations.map((stay) => (
-                <option key={stay.id} value={stay.id}>
+                <option
+                  value={stay.id}
+                  key={stay.id}
+                >
                   {stay.name}
                 </option>
               ))}
             </select>
           </label>
 
-          <div className="ys6-calendar-legend">
-            <span>
-              <i className="ys6-dot ys6-dot--booked" />
-              Reservation
-            </span>
-            <span>
-              <i className="ys6-dot ys6-dot--maintenance" />
-              Maintenance
-            </span>
-            <span>
-              <i className="ys6-dot ys6-dot--today" />
-              Today
-            </span>
+          <div className="op4-inspector-counts">
+            <div>
+              <strong>
+                {currentBookings.length}
+              </strong>
+              <span>ACTIVE STAY</span>
+            </div>
+
+            <div>
+              <strong>
+                {currentBlocks.length}
+              </strong>
+              <span>DATE BLOCK</span>
+            </div>
           </div>
 
-          <div className="ys6-calendar-grid">
-            {WEEKDAYS.map((day) => (
-              <div className="ys6-calendar-weekday" key={day}>
-                {day}
+          <h3>Booking records</h3>
+
+          {currentBookings.length ? (
+            currentBookings.map((booking) => (
+              <div
+                key={booking.id}
+                className="op4-calendar-entry"
+              >
+                <span>
+                  {booking.status
+                    .replaceAll("_", " ")
+                    .toUpperCase()}
+                </span>
+
+                <strong>
+                  {booking.guestName}
+                </strong>
+
+                <small>
+                  {booking.checkIn} →{" "}
+                  {booking.checkOut}
+                </small>
               </div>
-            ))}
-
-            {cells.map((day, index) => {
-              if (!day) {
-                return (
-                  <div
-                    className="ys6-calendar-blank"
-                    key={`blank-${index}`}
-                  />
-                );
-              }
-
-              const events = eventsForDay(day);
-
-              const number = Number(day.slice(-2));
-              const isToday = day === today;
-
-              return (
-                <button
-                  type="button"
-                  key={day}
-                  className={[
-                    "ys6-calendar-day",
-                    day === selectedDate ? "is-selected" : "",
-                    isToday ? "is-today" : "",
-                    day < today ? "is-past" : "",
-                  ].join(" ")}
-                  aria-pressed={day === selectedDate}
-                  aria-label={
-                    `${prettyDate(day)}. ` +
-                    `${events.bookings.length} booked, ` +
-                    `${events.blocks.length} maintenance blocks`
-                  }
-                  onClick={() => setSelectedDate(day)}
-                >
-                  <strong>{number}</strong>
-
-                  <div className="ys6-calendar-day-tags">
-                    {events.bookings.length > 0 && (
-                      <span className="ys6-cal-tag is-booked">
-                        {events.bookings.length} stay
-                      </span>
-                    )}
-
-                    {events.blocks.length > 0 && (
-                      <span className="ys6-cal-tag is-maintenance">
-                        {events.blocks.length} block
-                      </span>
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-
-          <p className="ys5-legal-note">
-            Check-out dates are not marked occupied unless
-            another reservation begins on that day.
-          </p>
-        </section>
-
-        <aside className="ys5-panel ys6-calendar-sidebar">
-          <span className="ys5-eyebrow">
-            SELECTED DATE
-          </span>
-
-          <h2>{prettyDate(selectedDate)}</h2>
-
-          <div className="ys6-calendar-summary">
-            <div>
-              <CalendarDays size={19} />
-              <strong>
-                {selectedEvents.bookings.length}
-              </strong>
-              <span>Active bookings</span>
-            </div>
-
-            <div>
-              <Wrench size={19} />
-              <strong>
-                {selectedEvents.blocks.length}
-              </strong>
-              <span>Maintenance blocks</span>
-            </div>
-          </div>
-
-          <h3 className="ys6-subheading">
-            Reserved accommodations
-          </h3>
-
-          {selectedEvents.bookings.length === 0 ? (
-            <p className="ys6-muted">
-              No active demo reservations on this date.
-            </p>
+            ))
           ) : (
-            <div className="ys6-calendar-events">
-              {selectedEvents.bookings.map((booking) => (
-                <article key={booking.id}>
-                  <span className="ys5-eyebrow">
-                    {booking.status.replaceAll("_", " ")}
-                  </span>
-                  <strong>
-                    {stayName(booking.accommodationId)}
-                  </strong>
-                  <small>
-                    {booking.checkIn} → {booking.checkOut}
-                  </small>
-                </article>
-              ))}
-            </div>
+            <p className="op4-muted">
+              No active reservation for the
+              selected residence and date.
+            </p>
           )}
 
-          <h3 className="ys6-subheading">
-            Maintenance periods
-          </h3>
+          <h3>Maintenance notes</h3>
 
-          {selectedEvents.blocks.length === 0 ? (
-            <p className="ys6-muted">
-              No maintenance recorded for this date.
-            </p>
+          {currentBlocks.length ? (
+            currentBlocks.map((block) => (
+              <div
+                key={block.id}
+                className="op4-calendar-entry"
+              >
+                <span>MAINTENANCE</span>
+                <strong>{block.note}</strong>
+
+                <small>
+                  {block.checkIn} →{" "}
+                  {block.checkOut}
+                </small>
+              </div>
+            ))
           ) : (
-            <div className="ys6-calendar-events">
-              {selectedEvents.blocks.map((block) => (
-                <article key={block.id}>
-                  <span className="ys5-eyebrow">
-                    MAINTENANCE
-                  </span>
-                  <strong>
-                    {stayName(block.accommodationId)}
-                  </strong>
-                  <small>{block.note}</small>
-                </article>
-              ))}
-            </div>
+            <p className="op4-muted">
+              No maintenance block on this date.
+            </p>
           )}
 
-          <div className="ys6-calendar-actions">
-            {selectedStayData && !isPast && (
-              <>
-                <h3 className="ys6-subheading">
-                  One-night availability
-                </h3>
-
-                <p
-                  className={`ys6-availability ${
-                    availability?.available ? "is-free" : "is-busy"
-                  }`}
-                  role="status"
-                >
-                  {availability?.available
-                    ? "Available in this browser's demo"
-                    : availability?.reason}
-                </p>
-
-                {availability?.available && (
-                  <Link
-                    className="ys5-button ys5-button-full"
-                    to={`/booking?${bookingParams}`}
-                  >
-                    Preview booking
-                    <ArrowRight size={17} />
-                  </Link>
-                )}
-              </>
-            )}
-
-            {selectedStay === "all" && (
-              <p className="ys6-muted">
-                Select a specific villa to check one-night
-                availability.
-              </p>
-            )}
-
-            <Link
-              to="/staff/reservations"
-              className="ys5-text-link"
+          {availability && (
+            <div
+              className={`op4-availability ${
+                availability.available
+                  ? "is-free"
+                  : "is-busy"
+              }`}
             >
-              View reservation desk
-              <ArrowUpRight size={17} />
+              <Clock3 size={17} />
+              <span>{availability.reason}</span>
+            </div>
+          )}
+
+          {availability?.available && (
+            <Link
+              className="op4-dark-button"
+              to={`/booking?${params}`}
+            >
+              PREVIEW A ONE-NIGHT BOOKING
+              <ArrowRight size={16} />
             </Link>
-          </div>
+          )}
+
+          <Link
+            className="op4-text-action"
+            to="/staff/reservations"
+          >
+            OPEN RESERVATION DESK
+            <ArrowUpRight size={16} />
+          </Link>
         </aside>
       </div>
     </div>

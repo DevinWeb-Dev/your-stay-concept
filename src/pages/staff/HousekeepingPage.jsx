@@ -1,33 +1,54 @@
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
+
 import { Link } from "react-router-dom";
 
 import {
   ArrowUpRight,
-  CheckCircle2,
-  ClipboardList,
+  Check,
+  ClipboardCheck,
   Clock3,
   Plus,
   Sparkles,
+  Waves,
   Wrench,
 } from "lucide-react";
 
-import { useResort } from "../../context/ResortContext.jsx";
+import {
+  useResort,
+} from "../../context/ResortContext.jsx";
 
-const STORAGE_KEY = "your-stay-housekeeping-demo-v1";
+// Preserve existing housekeeping tasks.
+const STORAGE_KEY =
+  "your-stay-housekeeping-demo-v1";
 
-const STATUSES = [
-  { id: "pending", label: "To do" },
-  { id: "in_progress", label: "In progress" },
-  { id: "ready", label: "Completed" },
+const STAGES = [
+  {
+    id: "pending",
+    label: "To prepare",
+  },
+  {
+    id: "in_progress",
+    label: "In progress",
+  },
+  {
+    id: "ready",
+    label: "Ready / completed",
+  },
 ];
 
 function loadTasks() {
   try {
-    const stored = JSON.parse(
+    const value = JSON.parse(
       localStorage.getItem(STORAGE_KEY) || "[]"
     );
 
-    return Array.isArray(stored) ? stored : [];
+    return Array.isArray(value)
+      ? value
+      : [];
   } catch {
     return [];
   }
@@ -42,27 +63,37 @@ export default function HousekeepingPage() {
 
   const [tasks, setTasks] = useState(loadTasks);
   const [filter, setFilter] = useState("all");
+
   const [stayId, setStayId] = useState(
     accommodations[0]?.id || ""
   );
+
   const [note, setNote] = useState("");
   const [feedback, setFeedback] = useState("");
 
+  // Automatically prepare checkout turnover tasks.
   useEffect(() => {
     const checkedOut = reservations.filter(
-      (booking) => booking.status === "checked_out"
+      (booking) =>
+        booking.status === "checked_out"
     );
 
     setTasks((current) => {
-      const existing = new Set(current.map((task) => task.id));
+      const exists = new Set(
+        current.map((task) => task.id)
+      );
 
-      const newTasks = checkedOut
+      const incoming = checkedOut
         .filter(
-          (booking) => !existing.has(`turnover:${booking.id}`)
+          (booking) =>
+            !exists.has(
+              `turnover:${booking.id}`
+            )
         )
         .map((booking) => ({
           id: `turnover:${booking.id}`,
-          accommodationId: booking.accommodationId,
+          accommodationId:
+            booking.accommodationId,
           title: "Post-checkout room turnover",
           description:
             `Prepare the room after booking ${booking.id}.`,
@@ -71,12 +102,13 @@ export default function HousekeepingPage() {
           source: "reservation",
         }));
 
-      return newTasks.length
-        ? [...newTasks, ...current]
+      return incoming.length
+        ? [...incoming, ...current]
         : current;
     });
   }, [reservations]);
 
+  // Store changes locally.
   useEffect(() => {
     try {
       localStorage.setItem(
@@ -84,44 +116,62 @@ export default function HousekeepingPage() {
         JSON.stringify(tasks)
       );
     } catch {
-      // Local browser storage might be unavailable.
+      // Browser storage can be unavailable.
     }
   }, [tasks]);
 
-  const getStayName = (id) =>
-    accommodations.find((item) => item.id === id)?.name ||
-    "Accommodation";
-
   const counts = Object.fromEntries(
-    STATUSES.map((status) => [
-      status.id,
-      tasks.filter((task) => task.status === status.id)
-        .length,
+    STAGES.map((stage) => [
+      stage.id,
+      tasks.filter(
+        (task) =>
+          task.status === stage.id
+      ).length,
     ])
   );
 
-  const visible = useMemo(() => {
-    return tasks
-      .filter(
-        (task) =>
-          filter === "all" || task.status === filter
+  const visible = useMemo(
+    () =>
+      tasks
+        .filter(
+          (task) =>
+            filter === "all" ||
+            task.status === filter
+        )
+        .sort((a, b) =>
+          (b.createdAt || "").localeCompare(
+            a.createdAt || ""
+          )
+        ),
+    [tasks, filter]
+  );
+
+  const getName = (id) =>
+    accommodations.find(
+      (stay) => stay.id === id
+    )?.name || "Residence";
+
+  const complete = tasks.length
+    ? Math.round(
+        (counts.ready / tasks.length) * 100
       )
-      .sort((a, b) =>
-        b.createdAt.localeCompare(a.createdAt)
-      );
-  }, [tasks, filter]);
+    : 0;
 
   function addTask(event) {
     event.preventDefault();
 
-    if (!stayId || note.trim().length < 3) {
-      setFeedback("Enter a task description.");
+    if (note.trim().length < 3) {
+      setFeedback(
+        "Write at least three characters for the task."
+      );
       return;
     }
 
     const task = {
       id: `TASK-${Date.now()}-${Math.random()
-        .toString(36).slice(2, 6)}`,
+        .toString(36)
+        .slice(2, 6)}`,
+
       accommodationId: stayId,
       title: "Manual housekeeping request",
       description: note.trim().slice(0, 150),
@@ -130,181 +180,256 @@ export default function HousekeepingPage() {
       source: "manual",
     };
 
-    setTasks((current) => [task, ...current]);
+    setTasks((old) => [task, ...old]);
     setNote("");
-    setFeedback("Housekeeping task added.");
     setFilter("all");
+
+    setFeedback(
+      "New housekeeping task created in this browser."
+    );
   }
 
-  function updateTask(id, status) {
-    setTasks((current) =>
-      current.map((task) =>
+  function moveTask(id, status) {
+    setTasks((old) =>
+      old.map((task) =>
         task.id === id
           ? {
               ...task,
               status,
-              updatedAt: new Date().toISOString(),
+              updatedAt:
+                new Date().toISOString(),
             }
           : task
       )
     );
 
-    setFeedback("Task status updated in this browser.");
+    setFeedback(
+      "Housekeeping status saved locally."
+    );
   }
 
-  const taskBlockedStays = new Set(
-    maintenanceBlocks.map((block) => block.accommodationId)
-  );
-
   return (
-    <div className="ys5-page">
-      <div className="ys5-page-heading">
+    <div className="op4-page">
+      <div className="op4-page-title">
         <div>
-          <span className="ys5-eyebrow">
-            THE HOUSEKEEPING STUDIO
+          <span className="op4-eyebrow">
+            OPERATIONS / CHAPTER 05 · PRESENTATION & READINESS
           </span>
 
           <h1>
-            Ready for <em>every arrival.</em>
+            Prepared with{" "}
+            <em>quiet precision.</em>
           </h1>
 
           <p>
-            Organize turnover, cleaning and presentation
-            tasks across the resort's accommodation collection.
+            A thoughtful cleaning and room-readiness
+            studio, connected to demo checkout events
+            and persisted within this browser.
           </p>
         </div>
 
-        <Link to="/staff/villas" className="ys5-button">
-          Manage date blocks <ArrowUpRight size={17} />
+        <Link
+          className="op4-dark-button"
+          to="/staff/villas"
+        >
+          VILLA DATE BLOCKS
+          <Wrench size={17} />
         </Link>
       </div>
 
-      <div className="ys5-mini-stats">
+      {/* HOUSEKEEPING MOTION GRAPHIC */}
+
+      <section className="op4-house-banner">
+        <div>
+          <span className="op4-eyebrow">
+            THE ROOM PREPARATION INDEX
+          </span>
+
+          <h2>
+            Every room tells a{" "}
+            <em>fresh story.</em>
+          </h2>
+
+          <p>
+            From post-checkout turnover to the
+            final presentation check, follow
+            each local task through three stages.
+          </p>
+        </div>
+
+        <div
+          className="op4-house-dial"
+          style={{
+            "--pct": `${complete}%`,
+          }}
+        >
+          <strong>{complete}%</strong>
+          <span>COMPLETED</span>
+        </div>
+      </section>
+
+      {/* INTERACTIVE STATUS FILTERS */}
+
+      <div
+        className="op4-house-status"
+        role="group"
+        aria-label="Filter housekeeping tasks"
+      >
         <button
           type="button"
-          className={filter === "all" ? "is-active" : ""}
+          aria-pressed={filter === "all"}
+          className={
+            filter === "all"
+              ? "is-current"
+              : ""
+          }
           onClick={() => setFilter("all")}
         >
+          <span>00 / ALL TASKS</span>
           <strong>{tasks.length}</strong>
-          <span>All tasks</span>
         </button>
 
-        {STATUSES.map((item) => (
+        {STAGES.map((stage, index) => (
           <button
-            key={item.id}
             type="button"
-            className={filter === item.id ? "is-active" : ""}
-            onClick={() => setFilter(item.id)}
+            key={stage.id}
+            aria-pressed={
+              filter === stage.id
+            }
+            className={
+              filter === stage.id
+                ? "is-current"
+                : ""
+            }
+            onClick={() =>
+              setFilter(stage.id)
+            }
           >
-            <strong>{counts[item.id]}</strong>
-            <span>{item.label}</span>
+            <span>
+              0{index + 1} /{" "}
+              {stage.label.toUpperCase()}
+            </span>
+
+            <strong>
+              {counts[stage.id]}
+            </strong>
           </button>
         ))}
       </div>
 
-      <div className="ys5-housekeeping-grid">
-        <section className="ys5-panel">
-          <div className="ys5-panel-heading">
+      <div className="op4-house-grid">
+        {/* WORKFLOW BOARD */}
+
+        <section className="op4-panel">
+          <div className="op4-panel-head">
             <div>
-              <span className="ys5-eyebrow">
-                OPERATIONAL TASKS
+              <span className="op4-eyebrow">
+                01 / WORKFLOW BOARD
               </span>
-              <h2>Cleaning & preparation</h2>
+
+              <h2>The preparation log.</h2>
             </div>
-            <ClipboardList size={22} />
+
+            <ClipboardCheck size={22} />
           </div>
 
-          {visible.length === 0 ? (
-            <div className="ys5-empty">
-              <Sparkles size={30} />
-              <p>
-                No tasks in this view. Complete a demo guest
-                checkout or create a cleaning request.
-              </p>
-            </div>
-          ) : (
-            <div className="ys5-task-list">
+          {visible.length ? (
+            <div className="op4-task-board">
               {visible.map((task) => (
-                <article className="ys5-task" key={task.id}>
-                  <div className="ys5-task-top">
-                    <span className="ys5-eyebrow">
-                      {getStayName(task.accommodationId)}
+                <article
+                  key={task.id}
+                  className={`op4-task op4-task--${task.status}`}
+                >
+                  <div className="op4-task-top">
+                    <span>
+                      {getName(
+                        task.accommodationId
+                      )}
                     </span>
 
-                    <span
-                      className={`ys5-status ys5-status-${task.status}`}
-                    >
-                      {task.status.replaceAll("_", " ")}
-                    </span>
+                    <b>
+                      {task.status
+                        .replaceAll("_", " ")
+                        .toUpperCase()}
+                    </b>
                   </div>
 
                   <h3>{task.title}</h3>
                   <p>{task.description}</p>
 
                   <small>
-                    Created{" "}
-                    {new Date(task.createdAt).toLocaleString(
-                      "en-PH"
-                    )}
+                    {task.source === "reservation"
+                      ? "AUTOMATIC CHECKOUT TASK"
+                      : "MANUAL TASK"}{" "}
+                    ·{" "}
+                    {new Date(
+                      task.createdAt
+                    ).toLocaleDateString("en-PH", {
+                      month: "short",
+                      day: "numeric",
+                    })}
                   </small>
 
-                  <div className="ys5-task-actions">
-                    {task.status === "pending" && (
+                  <div className="op4-task-actions">
+                    {STAGES.map((stage) => (
                       <button
+                        key={stage.id}
                         type="button"
+                        disabled={
+                          task.status === stage.id
+                        }
                         onClick={() =>
-                          updateTask(task.id, "in_progress")
+                          moveTask(
+                            task.id,
+                            stage.id
+                          )
                         }
                       >
-                        <Clock3 size={16} />
-                        Start cleaning
-                      </button>
-                    )}
+                        {task.status ===
+                        stage.id ? (
+                          <Check size={14} />
+                        ) : null}
 
-                    {task.status === "in_progress" && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateTask(task.id, "ready")
-                        }
-                      >
-                        <CheckCircle2 size={16} />
-                        Mark completed
+                        {stage.label}
                       </button>
-                    )}
-
-                    {task.status === "ready" && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updateTask(task.id, "pending")
-                        }
-                      >
-                        Reopen task
-                      </button>
-                    )}
+                    ))}
                   </div>
                 </article>
               ))}
             </div>
+          ) : (
+            <div className="op4-empty">
+              <Sparkles size={26} />
+              No tasks in this view. Add a
+              preparation request or simulate
+              guest checkout.
+            </div>
           )}
         </section>
 
-        <aside className="ys5-housekeeping-side">
-          <section className="ys5-panel">
-            <div className="ys5-panel-heading">
+        <aside className="op4-house-aside">
+          {/* CREATE HOUSEKEEPING TASK */}
+
+          <section className="op4-panel">
+            <div className="op4-panel-head">
               <div>
-                <span className="ys5-eyebrow">
-                  CREATE NEW REQUEST
+                <span className="op4-eyebrow">
+                  02 / NEW PREPARATION REQUEST
                 </span>
-                <h2>Add housekeeping task</h2>
+
+                <h2>Make it ready.</h2>
               </div>
+
               <Plus size={22} />
             </div>
 
-            <form onSubmit={addTask}>
-              <label className="ys5-field">
-                <span>ACCOMMODATION</span>
+            <form
+              className="op4-form-grid"
+              onSubmit={addTask}
+            >
+              <label className="op4-field op4-wide">
+                ACCOMMODATION
+
                 <select
                   value={stayId}
                   onChange={(event) =>
@@ -312,87 +437,88 @@ export default function HousekeepingPage() {
                   }
                 >
                   {accommodations.map((stay) => (
-                    <option key={stay.id} value={stay.id}>
+                    <option
+                      key={stay.id}
+                      value={stay.id}
+                    >
                       {stay.name}
                     </option>
                   ))}
                 </select>
               </label>
 
-              <label className="ys5-field">
-                <span>WORK DESCRIPTION</span>
+              <label className="op4-field op4-wide">
+                TASK DESCRIPTION
+
                 <textarea
-                  value={note}
+                  required
                   maxLength={150}
                   rows={4}
+                  value={note}
                   onChange={(event) =>
                     setNote(event.target.value)
                   }
-                  placeholder="e.g. Refresh linens and inspect the bathroom"
-                  required
-                  minLength={3}
+                  placeholder="e.g. Refresh linens, inspect terrace, replenish amenities"
                 />
               </label>
 
               <button
-                className="ys5-button ys5-button-full"
+                className="op4-dark-button op4-wide"
                 type="submit"
               >
-                <Plus size={17} />
-                Add task
+                ADD HOUSEKEEPING TASK
+                <ArrowUpRight size={16} />
               </button>
-
-              {feedback && (
-                <p className="ys5-feedback" role="status">
-                  {feedback}
-                </p>
-              )}
             </form>
+
+            {feedback && (
+              <p
+                className="op4-feedback"
+                role="status"
+              >
+                {feedback}
+              </p>
+            )}
           </section>
 
-          <section className="ys5-panel">
-            <div className="ys5-panel-heading">
-              <div>
-                <span className="ys5-eyebrow">
-                  BOOKING AVAILABILITY
-                </span>
-                <h2>Maintenance overview</h2>
-              </div>
-              <Wrench size={22} />
+          {/* OPERATIONS NOTES */}
+
+          <section className="op4-panel op4-house-notes">
+            <span className="op4-eyebrow">
+              03 / OPERATIONAL NOTES
+            </span>
+
+            <h2>Keep the details close.</h2>
+
+            <div>
+              <Clock3 size={17} />
+              Checked-out demo reservations
+              automatically generate turnover tasks.
             </div>
 
-            {accommodations.map((stay) => (
-              <div className="ys5-housekeeping-room" key={stay.id}>
-                <span>{stay.name}</span>
-                <strong>
-                  {taskBlockedStays.has(stay.id)
-                    ? "Has date blocks"
-                    : "No date blocks"}
-                </strong>
-              </div>
-            ))}
+            <div>
+              <Wrench size={17} />
 
-            <p className="ys5-legal-note">
-              This overview counts saved date blocks,
-              including future and past dates. To check
-              availability for specific dates, use Villa
-              Management.
-            </p>
+              {maintenanceBlocks.length} maintenance
+              blocks exist in the booking engine.
+            </div>
 
-            <Link to="/staff/villas" className="ys5-text-link">
-              View maintenance blocks
+            <div>
+              <Waves size={17} />
+              Task statuses are browser-local,
+              not synced to a live housekeeping service.
+            </div>
+
+            <Link
+              className="op4-text-action"
+              to="/staff/reservations"
+            >
+              OPEN RESERVATION DESK
               <ArrowUpRight size={16} />
             </Link>
           </section>
         </aside>
       </div>
-
-      <p className="ys5-legal-note">
-        Housekeeping checklist statuses are kept separately
-        in this browser. Marking a task completed does not
-        automatically remove maintenance blocks or change
-        booking availability.
-      </p>
     </div>
   );
 }
